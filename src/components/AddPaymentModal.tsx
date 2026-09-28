@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, PlusCircle, CheckCircle2, History, CreditCard, ArrowRight } from 'lucide-react';
+import { X, PlusCircle, CheckCircle2, History, AlertTriangle } from 'lucide-react';
 import { FriendJerseyOrder } from '../types/jersey';
-import { calculateBalance, calculatePaymentStatus, formatCurrency, getStatusConfig } from '../utils/calculations';
+import { calculateBalance, calculatePaymentStatus, formatCurrency, getStatusConfig, getMoneyIssueLabel } from '../utils/calculations';
 
 interface AddPaymentModalProps {
   isOpen: boolean;
@@ -12,7 +12,8 @@ interface AddPaymentModalProps {
     friendId: string,
     amount: number,
     method: 'UPI' | 'Cash' | 'Bank Transfer' | 'Other',
-    notes: string
+    notes: string,
+    resolveMoneyIssue?: boolean
   ) => void;
   onDeleteTransaction?: (friendId: string, txId: string) => void;
 }
@@ -27,17 +28,24 @@ export function AddPaymentModal({
 }: AddPaymentModalProps) {
   if (!isOpen || !friend) return null;
 
+  const hasActiveIssue = friend.status === 'MONEY_ISSUE' || Boolean(friend.moneyIssue?.hasIssue);
+
   const [paymentAmount, setPaymentAmount] = useState<number | ''>(
-    friend.balance > 0 ? (friend.balance > 500 ? 500 : friend.balance) : ''
+    friend.balance > 0 ? friend.balance : ''
   );
   const [method, setMethod] = useState<'UPI' | 'Cash' | 'Bank Transfer' | 'Other'>('UPI');
   const [notes, setNotes] = useState('');
+  const [resolveIssue, setResolveIssue] = useState<boolean>(hasActiveIssue);
   const [error, setError] = useState<string | null>(null);
 
   const numericNewPayment = Number(paymentAmount) || 0;
   const simulatedTotalPaid = friend.amountPaid + numericNewPayment;
   const simulatedBalance = calculateBalance(friend.totalJerseyPrice, simulatedTotalPaid);
-  const simulatedStatus = calculatePaymentStatus(friend.totalJerseyPrice, simulatedTotalPaid);
+  const simulatedStatus = calculatePaymentStatus(
+    friend.totalJerseyPrice,
+    simulatedTotalPaid,
+    hasActiveIssue && !resolveIssue
+  );
   const simulatedStatusInfo = getStatusConfig(simulatedStatus);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -47,7 +55,7 @@ export function AddPaymentModal({
       return;
     }
 
-    onAddPayment(friend.id, numericNewPayment, method, notes);
+    onAddPayment(friend.id, numericNewPayment, method, notes, resolveIssue);
     onClose();
   };
 
@@ -139,34 +147,73 @@ export function AddPaymentModal({
                 <button
                   type="button"
                   onClick={() => setPaymentAmount(friend.balance)}
-                  className="px-2.5 py-1 text-xs font-medium text-emerald-300 bg-emerald-950/60 border border-emerald-500/40 rounded-lg hover:bg-emerald-900/60 transition-colors"
+                  className="px-2.5 py-1 text-xs font-semibold text-emerald-300 bg-emerald-950/70 border border-emerald-500/50 rounded-lg hover:bg-emerald-900/60 transition-colors cursor-pointer"
                 >
-                  Pay Full Balance ({formatCurrency(friend.balance, currency)})
+                  🟢 Clear Full Balance ({formatCurrency(friend.balance, currency)})
+                </button>
+              )}
+              {friend.amountPaid === 0 && friend.totalJerseyPrice > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setPaymentAmount(Math.round(friend.totalJerseyPrice / 2))}
+                  className="px-2.5 py-1 text-xs font-semibold text-amber-300 bg-amber-950/70 border border-amber-500/50 rounded-lg hover:bg-amber-900/60 transition-colors cursor-pointer"
+                >
+                  🟡 50% Half Paid ({formatCurrency(Math.round(friend.totalJerseyPrice / 2), currency)})
                 </button>
               )}
               <button
                 type="button"
                 onClick={() => setPaymentAmount(500)}
-                className="px-2.5 py-1 text-xs font-medium text-slate-300 bg-slate-800 border border-slate-700 rounded-lg hover:text-white transition-colors"
+                className="px-2.5 py-1 text-xs font-medium text-slate-300 bg-slate-800 border border-slate-700 rounded-lg hover:text-white transition-colors cursor-pointer"
               >
                 + {currency}500
               </button>
               <button
                 type="button"
                 onClick={() => setPaymentAmount(1000)}
-                className="px-2.5 py-1 text-xs font-medium text-slate-300 bg-slate-800 border border-slate-700 rounded-lg hover:text-white transition-colors"
+                className="px-2.5 py-1 text-xs font-medium text-slate-300 bg-slate-800 border border-slate-700 rounded-lg hover:text-white transition-colors cursor-pointer"
               >
                 + {currency}1,000
               </button>
               <button
                 type="button"
                 onClick={() => setPaymentAmount(200)}
-                className="px-2.5 py-1 text-xs font-medium text-slate-300 bg-slate-800 border border-slate-700 rounded-lg hover:text-white transition-colors"
+                className="px-2.5 py-1 text-xs font-medium text-slate-300 bg-slate-800 border border-slate-700 rounded-lg hover:text-white transition-colors cursor-pointer"
               >
                 + {currency}200
               </button>
             </div>
           </div>
+
+          {/* Active Money Issue Resolution Banner */}
+          {hasActiveIssue && (
+            <div className="p-3.5 rounded-xl bg-orange-950/30 border border-orange-500/40 space-y-2">
+              <div className="flex items-center gap-2 text-xs font-semibold text-orange-300">
+                <AlertTriangle className="w-4 h-4 text-orange-400 shrink-0" />
+                <span>Active Money Issue: {getMoneyIssueLabel(friend.moneyIssue?.issueType)}</span>
+              </div>
+              {friend.moneyIssue?.issueNote && (
+                <p className="text-[11px] text-orange-300/80 pl-6 italic">
+                  "{friend.moneyIssue.issueNote}"
+                </p>
+              )}
+              <div className="pl-6 pt-1 flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="resolveIssueCheckbox"
+                  checked={resolveIssue}
+                  onChange={(e) => setResolveIssue(e.target.checked)}
+                  className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-slate-900 border-slate-700 cursor-pointer"
+                />
+                <label
+                  htmlFor="resolveIssueCheckbox"
+                  className="text-xs text-slate-200 font-medium cursor-pointer"
+                >
+                  Mark this Money Issue as resolved with this payment
+                </label>
+              </div>
+            </div>
+          )}
 
           {/* Payment Method */}
           <div>

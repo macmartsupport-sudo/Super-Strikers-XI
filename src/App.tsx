@@ -1,24 +1,17 @@
 import React, { useState, useMemo } from 'react';
 import {
   Search,
-  Filter,
   Plus,
-  ArrowUpDown,
   LayoutGrid,
   Table as TableIcon,
   Shirt,
-  Sparkles,
-  Users,
-  CheckCircle2,
-  AlertCircle,
-  XCircle,
   RotateCcw,
 } from 'lucide-react';
 import {
   FriendJerseyOrder,
-  JerseySize,
   StatusFilter,
   SortOption,
+  MoneyIssueDetails,
 } from './types/jersey';
 import { useJerseyTracker } from './hooks/useJerseyTracker';
 import { exportToCSV, JERSEY_SIZES } from './utils/calculations';
@@ -29,6 +22,7 @@ import { JerseyCard } from './components/JerseyCard';
 import { AddEditFriendModal } from './components/AddEditFriendModal';
 import { AddPaymentModal } from './components/AddPaymentModal';
 import { FriendDetailsModal } from './components/FriendDetailsModal';
+import { MoneyIssueModal } from './components/MoneyIssueModal';
 import { VendorSheetModal } from './components/VendorSheetModal';
 import { TeamSettingsModal } from './components/TeamSettingsModal';
 import { ConfirmModal } from './components/ConfirmModal';
@@ -45,7 +39,9 @@ export default function App() {
     deleteFriend,
     addPayment,
     quickMarkPaid,
+    quickSetStatus,
     deletePaymentTransaction,
+    setFriendMoneyIssue,
     resetSampleData,
     clearAllData,
     updateTeamSettings,
@@ -65,6 +61,9 @@ export default function App() {
   const [isAddPaymentOpen, setIsAddPaymentOpen] = useState(false);
   const [paymentFriend, setPaymentFriend] = useState<FriendJerseyOrder | null>(null);
 
+  const [isMoneyIssueOpen, setIsMoneyIssueOpen] = useState(false);
+  const [moneyIssueFriend, setMoneyIssueFriend] = useState<FriendJerseyOrder | null>(null);
+
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [detailsFriend, setDetailsFriend] = useState<FriendJerseyOrder | null>(null);
 
@@ -77,7 +76,7 @@ export default function App() {
   const filteredFriends = useMemo(() => {
     return friends
       .filter((friend) => {
-        // Status filter
+        // Status filter (PAID, HALF_PAID, NOT_PAID, MONEY_ISSUE)
         if (statusFilter !== 'ALL' && friend.status !== statusFilter) {
           return false;
         }
@@ -95,14 +94,22 @@ export default function App() {
           const matchesNumber = friend.jerseyNumber.toLowerCase().includes(q);
           const matchesPhone = friend.phone.toLowerCase().includes(q);
           const matchesNotes = friend.notes.toLowerCase().includes(q);
-          return matchesName || matchesJerseyName || matchesNumber || matchesPhone || matchesNotes;
+          const matchesIssue =
+            friend.moneyIssue?.issueNote?.toLowerCase().includes(q) || false;
+          return (
+            matchesName ||
+            matchesJerseyName ||
+            matchesNumber ||
+            matchesPhone ||
+            matchesNotes ||
+            matchesIssue
+          );
         }
 
         return true;
       })
       .sort((a, b) => {
         if (sortBy === 'balance_desc') {
-          // Highest unpaid balance first
           return b.balance - a.balance;
         }
         if (sortBy === 'name_asc') {
@@ -121,13 +128,14 @@ export default function App() {
       });
   }, [friends, statusFilter, sizeFilter, searchQuery, sortBy]);
 
-  // Status counts for tabs
+  // Status counts for tabs (Paid, Half Paid, Not Paid, Money Issue)
   const counts = useMemo(() => {
     return {
       all: friends.length,
       paid: friends.filter((f) => f.status === 'PAID').length,
       halfPaid: friends.filter((f) => f.status === 'HALF_PAID').length,
       notPaid: friends.filter((f) => f.status === 'NOT_PAID').length,
+      moneyIssue: friends.filter((f) => f.status === 'MONEY_ISSUE').length,
     };
   }, [friends]);
 
@@ -147,6 +155,11 @@ export default function App() {
     setIsAddPaymentOpen(true);
   };
 
+  const handleOpenMoneyIssue = (friend: FriendJerseyOrder) => {
+    setMoneyIssueFriend(friend);
+    setIsMoneyIssueOpen(true);
+  };
+
   const handleOpenDetails = (friend: FriendJerseyOrder) => {
     setDetailsFriend(friend);
     setIsDetailsOpen(true);
@@ -158,6 +171,13 @@ export default function App() {
     } else {
       addFriend(data);
     }
+  };
+
+  const handleSaveMoneyIssue = (
+    friendId: string,
+    issue: MoneyIssueDetails | undefined
+  ) => {
+    setFriendMoneyIssue(friendId, issue);
   };
 
   const handleExportCSV = () => {
@@ -200,7 +220,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Section 2: Dashboard Metrics */}
+        {/* Section: Dashboard Metrics with 4 Categories: Paid, Half Paid, Not Paid, Money Issue */}
         <Dashboard
           friends={friends}
           currency={settings.currency}
@@ -208,11 +228,11 @@ export default function App() {
           onSelectFilter={(newFilter) => setStatusFilter(newFilter)}
         />
 
-        {/* Section 4 & 5: Filter Bar and Friends Payment List */}
+        {/* Section: Filter Bar and Friends Payment List */}
         <section aria-label="Friends Payment List" className="space-y-4">
           {/* Controls Bar */}
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-md">
-            {/* Status Filter Tabs (PAID, HALF PAID, NOT PAID) */}
+            {/* Status Filter Tabs (Paid, Half Paid, Not Paid, Money Issue) */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
                 <button
@@ -224,15 +244,16 @@ export default function App() {
                       : 'text-slate-400 hover:text-white hover:bg-slate-800'
                   }`}
                 >
-                  All Friends ({counts.all})
+                  All Players ({counts.all})
                 </button>
 
+                {/* 1. Paid */}
                 <button
                   type="button"
                   onClick={() => setStatusFilter('PAID')}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
                     statusFilter === 'PAID'
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                      ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 shadow-sm'
                       : 'text-slate-400 hover:text-emerald-400 hover:bg-slate-800'
                   }`}
                 >
@@ -240,12 +261,13 @@ export default function App() {
                   <span>Paid ({counts.paid})</span>
                 </button>
 
+                {/* 2. Half Paid */}
                 <button
                   type="button"
                   onClick={() => setStatusFilter('HALF_PAID')}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
                     statusFilter === 'HALF_PAID'
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                      ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50 shadow-sm'
                       : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800'
                   }`}
                 >
@@ -253,17 +275,32 @@ export default function App() {
                   <span>Half Paid ({counts.halfPaid})</span>
                 </button>
 
+                {/* 3. Not Paid */}
                 <button
                   type="button"
                   onClick={() => setStatusFilter('NOT_PAID')}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
                     statusFilter === 'NOT_PAID'
-                      ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm'
+                      ? 'bg-rose-500/25 text-rose-300 border border-rose-500/50 shadow-sm'
                       : 'text-slate-400 hover:text-rose-400 hover:bg-slate-800'
                   }`}
                 >
                   <span>🔴</span>
                   <span>Not Paid ({counts.notPaid})</span>
+                </button>
+
+                {/* 4. Money Issue (Requested) */}
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('MONEY_ISSUE')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+                    statusFilter === 'MONEY_ISSUE'
+                      ? 'bg-orange-500/25 text-orange-300 border border-orange-500/60 shadow-sm shadow-orange-500/20'
+                      : 'text-slate-400 hover:text-orange-400 hover:bg-slate-800'
+                  }`}
+                >
+                  <span>⚠️</span>
+                  <span>Money Issue ({counts.moneyIssue})</span>
                 </button>
               </div>
 
@@ -273,7 +310,7 @@ export default function App() {
                   type="button"
                   onClick={() => setViewMode('table')}
                   title="Table view"
-                  className={`p-1.5 rounded-md transition-colors ${
+                  className={`p-1.5 rounded-md transition-colors cursor-pointer ${
                     viewMode === 'table'
                       ? 'bg-slate-800 text-blue-400 shadow-sm'
                       : 'text-slate-400 hover:text-white'
@@ -285,7 +322,7 @@ export default function App() {
                   type="button"
                   onClick={() => setViewMode('cards')}
                   title="Card view"
-                  className={`p-1.5 rounded-md transition-colors ${
+                  className={`p-1.5 rounded-md transition-colors cursor-pointer ${
                     viewMode === 'cards'
                       ? 'bg-slate-800 text-blue-400 shadow-sm'
                       : 'text-slate-400 hover:text-white'
@@ -303,7 +340,7 @@ export default function App() {
                 <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
                 <input
                   type="text"
-                  placeholder="Search by player, jersey name, #number, phone..."
+                  placeholder="Search player, jersey name, #number, phone, issue..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -312,7 +349,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="text-xs text-slate-500 hover:text-white absolute right-3 top-2.5"
+                    className="text-xs text-slate-500 hover:text-white absolute right-3 top-2.5 cursor-pointer"
                   >
                     Clear
                   </button>
@@ -354,22 +391,21 @@ export default function App() {
 
           {/* Friends List Rendering */}
           {friends.length === 0 ? (
-            /* Empty State: No friends registered at all */
             <div className="text-center py-16 px-4 bg-slate-900/40 rounded-2xl border border-dashed border-slate-800 space-y-4">
               <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center">
                 <Shirt className="w-8 h-8 text-blue-400" />
               </div>
               <div className="max-w-sm mx-auto space-y-1">
-                <h3 className="text-base font-bold text-white">No Friends in Jersey Order</h3>
+                <h3 className="text-base font-bold text-white">No Players in Jersey Order</h3>
                 <p className="text-xs text-slate-400">
-                  Start tracking payments and sizes for your cricket squad.
+                  Track payments, sizes, and money issues for your cricket squad.
                 </p>
               </div>
               <div className="flex items-center justify-center gap-3 pt-2">
                 <button
                   type="button"
                   onClick={resetSampleData}
-                  className="px-4 py-2 text-xs font-medium text-slate-300 bg-slate-800 hover:text-white rounded-xl transition-colors flex items-center gap-1.5"
+                  className="px-4 py-2 text-xs font-medium text-slate-300 bg-slate-800 hover:text-white rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
                   <RotateCcw className="w-4 h-4" />
                   <span>Load Sample Squad</span>
@@ -377,7 +413,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handleOpenAddFriend}
-                  className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-xl transition-colors shadow-md flex items-center gap-1.5"
+                  className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-xl transition-colors shadow-md flex items-center gap-1.5 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add First Friend</span>
@@ -385,10 +421,9 @@ export default function App() {
               </div>
             </div>
           ) : filteredFriends.length === 0 ? (
-            /* Empty State: Filter or search returned 0 results */
             <div className="text-center py-12 px-4 bg-slate-900/30 rounded-2xl border border-slate-800 space-y-3">
               <p className="text-sm font-semibold text-slate-300">
-                No matching friends found for selected filters.
+                No matching players found for selected filters.
               </p>
               <button
                 type="button"
@@ -397,14 +432,14 @@ export default function App() {
                   setStatusFilter('ALL');
                   setSizeFilter('ALL');
                 }}
-                className="px-3.5 py-1.5 text-xs text-blue-400 bg-blue-950/40 border border-blue-500/30 rounded-lg hover:bg-blue-900/40 transition-colors"
+                className="px-3.5 py-1.5 text-xs text-blue-400 bg-blue-950/40 border border-blue-500/30 rounded-lg hover:bg-blue-900/40 transition-colors cursor-pointer"
               >
                 Reset Search & Filters
               </button>
             </div>
           ) : (
             <div>
-              {/* Desktop Table View (when viewMode is 'table') */}
+              {/* Desktop Table View */}
               <div className={viewMode === 'table' ? 'hidden md:block' : 'hidden'}>
                 <JerseyTable
                   friends={filteredFriends}
@@ -413,13 +448,15 @@ export default function App() {
                   upiId={settings.upiId}
                   onViewDetails={handleOpenDetails}
                   onAddPayment={handleOpenAddPayment}
+                  onOpenMoneyIssue={handleOpenMoneyIssue}
                   onEdit={handleOpenEdit}
                   onDelete={handleRequestDelete}
                   onQuickMarkPaid={quickMarkPaid}
+                  onQuickSetStatus={quickSetStatus}
                 />
               </div>
 
-              {/* Mobile Card Grid (Always on mobile, and on desktop when 'cards' view is chosen) */}
+              {/* Mobile Card Grid */}
               <div
                 className={
                   viewMode === 'cards'
@@ -436,8 +473,10 @@ export default function App() {
                     upiId={settings.upiId}
                     onViewDetails={handleOpenDetails}
                     onAddPayment={handleOpenAddPayment}
+                    onOpenMoneyIssue={handleOpenMoneyIssue}
                     onEdit={handleOpenEdit}
                     onDelete={handleRequestDelete}
+                    onQuickSetStatus={quickSetStatus}
                   />
                 ))}
               </div>
@@ -497,6 +536,14 @@ export default function App() {
         onDeleteTransaction={deletePaymentTransaction}
       />
 
+      <MoneyIssueModal
+        isOpen={isMoneyIssueOpen}
+        onClose={() => setIsMoneyIssueOpen(false)}
+        friend={moneyIssueFriend}
+        currency={settings.currency}
+        onSaveIssue={handleSaveMoneyIssue}
+      />
+
       <FriendDetailsModal
         isOpen={isDetailsOpen}
         onClose={() => setIsDetailsOpen(false)}
@@ -504,9 +551,21 @@ export default function App() {
         currency={settings.currency}
         teamName={settings.teamName}
         upiId={settings.upiId}
+        onQuickSetStatus={(id, status) => {
+          quickSetStatus(id, status);
+          if (detailsFriend && detailsFriend.id === id) {
+            // refresh details modal friend object
+            const updated = friends.find((f) => f.id === id);
+            if (updated) setDetailsFriend(updated);
+          }
+        }}
         onOpenAddPayment={(f) => {
           setIsDetailsOpen(false);
           handleOpenAddPayment(f);
+        }}
+        onOpenMoneyIssue={(f) => {
+          setIsDetailsOpen(false);
+          handleOpenMoneyIssue(f);
         }}
         onOpenEdit={(f) => {
           setIsDetailsOpen(false);

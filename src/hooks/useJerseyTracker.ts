@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FriendJerseyOrder, TeamSettings, JerseySize } from '../types/jersey';
+import { FriendJerseyOrder, TeamSettings, JerseySize, PaymentStatus } from '../types/jersey';
 import { calculateBalance, calculatePaymentStatus } from '../utils/calculations';
 import { INITIAL_SAMPLE_FRIENDS } from '../utils/sampleData';
 import {
@@ -163,11 +163,13 @@ export function useJerseyTracker() {
     amountPaid: number;
     notes: string;
     initialPaymentMethod?: 'UPI' | 'Cash' | 'Bank Transfer' | 'Other';
+    moneyIssue?: FriendJerseyOrder['moneyIssue'];
   }) => {
     const totalJerseyPrice = Math.max(0, Number(data.totalJerseyPrice) || 0);
     const amountPaid = Math.max(0, Number(data.amountPaid) || 0);
+    const hasIssue = Boolean(data.moneyIssue?.hasIssue);
     const balance = calculateBalance(totalJerseyPrice, amountPaid);
-    const status = calculatePaymentStatus(totalJerseyPrice, amountPaid);
+    const status = calculatePaymentStatus(totalJerseyPrice, amountPaid, hasIssue);
     const now = new Date().toISOString();
     const friendId = `friend-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
 
@@ -194,6 +196,7 @@ export function useJerseyTracker() {
       balance,
       status,
       notes: data.notes.trim(),
+      moneyIssue: data.moneyIssue,
       createdAt: now,
       updatedAt: now,
       paymentHistory,
@@ -224,12 +227,14 @@ export function useJerseyTracker() {
       totalJerseyPrice: number;
       amountPaid: number;
       notes: string;
+      moneyIssue?: FriendJerseyOrder['moneyIssue'];
     }
   ) => {
     const totalJerseyPrice = Math.max(0, Number(data.totalJerseyPrice) || 0);
     const amountPaid = Math.max(0, Number(data.amountPaid) || 0);
+    const hasIssue = Boolean(data.moneyIssue?.hasIssue);
     const balance = calculateBalance(totalJerseyPrice, amountPaid);
-    const status = calculatePaymentStatus(totalJerseyPrice, amountPaid);
+    const status = calculatePaymentStatus(totalJerseyPrice, amountPaid, hasIssue);
     const now = new Date().toISOString();
 
     let updatedFriend: FriendJerseyOrder | null = null;
@@ -249,6 +254,7 @@ export function useJerseyTracker() {
           balance,
           status,
           notes: data.notes.trim(),
+          moneyIssue: data.moneyIssue,
           updatedAt: now,
         };
         return updatedFriend;
@@ -260,6 +266,39 @@ export function useJerseyTracker() {
         await setDoc(doc(db, 'jersey_orders', id), updatedFriend);
       } catch (error) {
         handleFirestoreError(error, OperationType.WRITE, `jersey_orders/${id}`);
+      }
+    }
+  };
+
+  // Flag or resolve a money issue on a friend
+  const setFriendMoneyIssue = async (
+    friendId: string,
+    issue: FriendJerseyOrder['moneyIssue']
+  ) => {
+    let updatedFriend: FriendJerseyOrder | null = null;
+    const now = new Date().toISOString();
+
+    setFriends((prev) =>
+      prev.map((item) => {
+        if (item.id !== friendId) return item;
+        const hasIssue = Boolean(issue?.hasIssue);
+        const newStatus = calculatePaymentStatus(item.totalJerseyPrice, item.amountPaid, hasIssue);
+
+        updatedFriend = {
+          ...item,
+          moneyIssue: issue,
+          status: newStatus,
+          updatedAt: now,
+        };
+        return updatedFriend;
+      })
+    );
+
+    if (updatedFriend) {
+      try {
+        await setDoc(doc(db, 'jersey_orders', friendId), updatedFriend);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, `jersey_orders/${friendId}`);
       }
     }
   };
@@ -280,7 +319,8 @@ export function useJerseyTracker() {
     friendId: string,
     newPaymentAmount: number,
     method: 'UPI' | 'Cash' | 'Bank Transfer' | 'Other' = 'UPI',
-    notes = ''
+    notes = '',
+    resolveMoneyIssue = false
   ) => {
     const safeAmount = Math.max(0, Number(newPaymentAmount) || 0);
     if (safeAmount <= 0) return;
@@ -294,7 +334,9 @@ export function useJerseyTracker() {
 
         const updatedAmountPaid = friend.amountPaid + safeAmount;
         const newBalance = calculateBalance(friend.totalJerseyPrice, updatedAmountPaid);
-        const newStatus = calculatePaymentStatus(friend.totalJerseyPrice, updatedAmountPaid);
+        const shouldResolve = resolveMoneyIssue || (friend.moneyIssue?.issueType === 'UPI_FAILED_OR_PENDING' && updatedAmountPaid >= friend.totalJerseyPrice);
+        const hasIssue = shouldResolve ? false : Boolean(friend.moneyIssue?.hasIssue);
+        const newStatus = calculatePaymentStatus(friend.totalJerseyPrice, updatedAmountPaid, hasIssue);
 
         const newTx = {
           id: `pay-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -309,6 +351,7 @@ export function useJerseyTracker() {
           amountPaid: updatedAmountPaid,
           balance: newBalance,
           status: newStatus,
+          moneyIssue: shouldResolve ? undefined : friend.moneyIssue,
           updatedAt: now,
           paymentHistory: [newTx, ...friend.paymentHistory],
         };
@@ -326,32 +369,83 @@ export function useJerseyTracker() {
     }
   };
 
-  // Quick mark fully paid
-  const quickMarkPaid = async (friendId: string) => {
+  // Quick set status directly: PAID, HALF_PAID, NOT_PAID, or MONEY_ISSUE
+  const quickSetStatus = async (
+    friendId: string,
+    targetStatus: PaymentStatus,
+    issueDetails?: FriendJerseyOrder['moneyIssue']
+  ) => {
     let updatedFriend: FriendJerseyOrder | null = null;
+    const now = new Date().toISOString();
 
     setFriends((prev) =>
       prev.map((friend) => {
         if (friend.id !== friendId) return friend;
-        const remaining = friend.balance;
-        if (remaining <= 0) return friend;
 
-        const now = new Date().toISOString();
-        const newTx = {
-          id: `pay-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          amount: remaining,
-          date: now,
-          method: 'UPI' as const,
-          notes: 'Marked full payment',
-        };
+        let newAmountPaid = friend.amountPaid;
+        let newBalance = friend.balance;
+        let newStatus: PaymentStatus = targetStatus;
+        let newIssue: FriendJerseyOrder['moneyIssue'] = undefined;
+        let newHistory = [...friend.paymentHistory];
+
+        if (targetStatus === 'PAID') {
+          const diff = friend.totalJerseyPrice - friend.amountPaid;
+          newAmountPaid = friend.totalJerseyPrice;
+          newBalance = 0;
+          newStatus = 'PAID';
+          newIssue = undefined;
+          if (diff > 0) {
+            newHistory = [
+              {
+                id: `pay-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                amount: diff,
+                date: now,
+                method: 'UPI',
+                notes: 'Cleared full payment',
+              },
+              ...newHistory,
+            ];
+          }
+        } else if (targetStatus === 'HALF_PAID') {
+          const half = Math.round(friend.totalJerseyPrice / 2);
+          newAmountPaid = half;
+          newBalance = calculateBalance(friend.totalJerseyPrice, half);
+          newStatus = 'HALF_PAID';
+          newIssue = undefined;
+          newHistory = [
+            {
+              id: `pay-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              amount: half,
+              date: now,
+              method: 'UPI',
+              notes: '50% advance installment',
+            },
+          ];
+        } else if (targetStatus === 'NOT_PAID') {
+          newAmountPaid = 0;
+          newBalance = friend.totalJerseyPrice;
+          newStatus = 'NOT_PAID';
+          newIssue = undefined;
+          newHistory = [];
+        } else if (targetStatus === 'MONEY_ISSUE') {
+          newStatus = 'MONEY_ISSUE';
+          newIssue = issueDetails || {
+            hasIssue: true,
+            issueType: friend.amountPaid > friend.totalJerseyPrice ? 'OVERPAID' : 'UPI_FAILED_OR_PENDING',
+            issueAmount: friend.balance || friend.totalJerseyPrice,
+            issueNote: 'Payment discrepancy flagged by captain',
+            flaggedAt: now,
+          };
+        }
 
         updatedFriend = {
           ...friend,
-          amountPaid: friend.totalJerseyPrice,
-          balance: 0,
-          status: 'PAID' as const,
+          amountPaid: newAmountPaid,
+          balance: newBalance,
+          status: newStatus,
+          moneyIssue: newIssue,
           updatedAt: now,
-          paymentHistory: [newTx, ...friend.paymentHistory],
+          paymentHistory: newHistory,
         };
 
         return updatedFriend;
@@ -365,6 +459,11 @@ export function useJerseyTracker() {
         handleFirestoreError(error, OperationType.WRITE, `jersey_orders/${friendId}`);
       }
     }
+  };
+
+  // Quick mark fully paid
+  const quickMarkPaid = async (friendId: string) => {
+    await quickSetStatus(friendId, 'PAID');
   };
 
   // Delete an individual payment transaction
@@ -446,7 +545,9 @@ export function useJerseyTracker() {
     deleteFriend,
     addPayment,
     quickMarkPaid,
+    quickSetStatus,
     deletePaymentTransaction,
+    setFriendMoneyIssue,
     resetSampleData,
     clearAllData,
     updateTeamSettings,

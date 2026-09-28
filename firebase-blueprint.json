@@ -45,7 +45,11 @@
         "status": {
           "type": "string",
           "description": "Calculated payment status",
-          "enum": ["PAID", "HALF_PAID", "NOT_PAID"]
+          "enum": ["PAID", "HALF_PAID", "NOT_PAID", "MONEY_ISSUE"]
+        },
+        "moneyIssue": {
+          "type": "object",
+          "description": "Details regarding any money dispute, overpayment, failed UPI or issue"
         },
         "notes": {
           "type": "string",

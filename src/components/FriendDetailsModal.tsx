@@ -1,7 +1,7 @@
 import React from 'react';
-import { X, Phone, MessageSquare, PlusCircle, Edit3, Trash2, Calendar, FileText, CheckCircle2 } from 'lucide-react';
-import { FriendJerseyOrder } from '../types/jersey';
-import { formatCurrency, getStatusConfig, generateWhatsAppLink } from '../utils/calculations';
+import { X, MessageSquare, PlusCircle, Edit3, Trash2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { FriendJerseyOrder, PaymentStatus } from '../types/jersey';
+import { formatCurrency, getStatusConfig, generateWhatsAppLink, getMoneyIssueLabel } from '../utils/calculations';
 import { JerseyPreview } from './JerseyPreview';
 
 interface FriendDetailsModalProps {
@@ -12,8 +12,10 @@ interface FriendDetailsModalProps {
   teamName: string;
   upiId?: string;
   onOpenAddPayment: (friend: FriendJerseyOrder) => void;
+  onOpenMoneyIssue: (friend: FriendJerseyOrder) => void;
   onOpenEdit: (friend: FriendJerseyOrder) => void;
   onDelete: (id: string) => void;
+  onQuickSetStatus?: (id: string, status: PaymentStatus) => void;
 }
 
 export function FriendDetailsModal({
@@ -24,13 +26,16 @@ export function FriendDetailsModal({
   teamName,
   upiId,
   onOpenAddPayment,
+  onOpenMoneyIssue,
   onOpenEdit,
   onDelete,
+  onQuickSetStatus,
 }: FriendDetailsModalProps) {
   if (!isOpen || !friend) return null;
 
   const statusInfo = getStatusConfig(friend.status);
   const waLink = generateWhatsAppLink(friend, teamName, currency, upiId);
+  const hasIssue = friend.status === 'MONEY_ISSUE' || Boolean(friend.moneyIssue?.hasIssue);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
@@ -51,13 +56,13 @@ export function FriendDetailsModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-5">
           {/* Visual Jersey Showcase & Core Order Specs */}
           <div className="flex flex-col sm:flex-row items-center gap-6 p-4 rounded-xl bg-slate-950 border border-slate-800">
             <div className="shrink-0">
@@ -103,10 +108,46 @@ export function FriendDetailsModal({
             </div>
           </div>
 
-          {/* Financial Breakdown (User requirement 1 & 4) */}
+          {/* Money Issue Banner if active */}
+          {hasIssue && (
+            <div className="p-4 rounded-xl bg-orange-950/30 border border-orange-500/40 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-orange-400 shrink-0" />
+                  <div>
+                    <h4 className="text-xs font-bold text-orange-300">
+                      Money Issue Flagged: {getMoneyIssueLabel(friend.moneyIssue?.issueType)}
+                    </h4>
+                    {friend.moneyIssue?.issueAmount ? (
+                      <p className="text-[11px] text-orange-400 font-mono-num">
+                        Disputed / Pending Amount: {formatCurrency(friend.moneyIssue.issueAmount, currency)}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenMoneyIssue(friend);
+                  }}
+                  className="px-2.5 py-1 text-xs font-semibold text-orange-200 bg-orange-600/40 hover:bg-orange-600/70 border border-orange-500/50 rounded-lg transition-colors cursor-pointer"
+                >
+                  Manage Issue
+                </button>
+              </div>
+              {friend.moneyIssue?.issueNote && (
+                <p className="text-xs text-orange-200/90 pl-7 italic bg-orange-950/50 p-2 rounded border border-orange-500/20">
+                  "{friend.moneyIssue.issueNote}"
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Financial Breakdown */}
           <div className="grid grid-cols-3 gap-3">
             <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
-              <span className="text-[11px] text-slate-400 block font-medium">Total Jersey Price</span>
+              <span className="text-[11px] text-slate-400 block font-medium">Total Jersey Cost</span>
               <span className="text-lg font-bold font-mono-num text-white mt-0.5 block">
                 {formatCurrency(friend.totalJerseyPrice, currency)}
               </span>
@@ -127,17 +168,92 @@ export function FriendDetailsModal({
             </div>
           </div>
 
+          {/* Quick Status Control (Paid, Half Paid, Not Paid, Money Issue) */}
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-slate-300 uppercase tracking-wider text-[11px]">
+                Quick Status Switch:
+              </span>
+              <span className="text-slate-500 text-[10px]">Tap to update status instantly</span>
+            </div>
+            <div className="grid grid-cols-4 gap-2 text-center text-xs">
+              <button
+                type="button"
+                onClick={() => onQuickSetStatus && onQuickSetStatus(friend.id, 'PAID')}
+                className={`py-2 px-1 rounded-lg border font-bold transition-all cursor-pointer ${
+                  friend.status === 'PAID'
+                    ? 'bg-emerald-950/70 border-emerald-500 text-emerald-300 ring-2 ring-emerald-500/40 shadow-sm'
+                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                }`}
+              >
+                🟢 Paid
+              </button>
+              <button
+                type="button"
+                onClick={() => onQuickSetStatus && onQuickSetStatus(friend.id, 'HALF_PAID')}
+                className={`py-2 px-1 rounded-lg border font-bold transition-all cursor-pointer ${
+                  friend.status === 'HALF_PAID'
+                    ? 'bg-amber-950/70 border-amber-500 text-amber-300 ring-2 ring-amber-500/40 shadow-sm'
+                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                }`}
+              >
+                🟡 Half Paid
+              </button>
+              <button
+                type="button"
+                onClick={() => onQuickSetStatus && onQuickSetStatus(friend.id, 'NOT_PAID')}
+                className={`py-2 px-1 rounded-lg border font-bold transition-all cursor-pointer ${
+                  friend.status === 'NOT_PAID'
+                    ? 'bg-rose-950/70 border-rose-500 text-rose-300 ring-2 ring-rose-500/40 shadow-sm'
+                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                }`}
+              >
+                🔴 Not Paid
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenMoneyIssue(friend);
+                }}
+                className={`py-2 px-1 rounded-lg border font-bold transition-all cursor-pointer ${
+                  friend.status === 'MONEY_ISSUE'
+                    ? 'bg-orange-950/70 border-orange-500 text-orange-300 ring-2 ring-orange-500/40 shadow-sm'
+                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                }`}
+              >
+                ⚠️ Issue
+              </button>
+            </div>
+          </div>
+
           {/* Payment History Timeline */}
           <div className="space-y-2">
-            <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              Payment Transaction History
-            </h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                Payment Transaction History
+              </h4>
+              {!hasIssue && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenMoneyIssue(friend);
+                  }}
+                  className="text-[11px] text-orange-400 hover:text-orange-300 flex items-center gap-1 cursor-pointer"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span>Report Money Issue</span>
+                </button>
+              )}
+            </div>
+
             {friend.paymentHistory.length === 0 ? (
               <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-center text-xs text-slate-500">
-                No payments recorded yet (🔴 NOT PAID)
+                No payments recorded yet ({friend.status === 'MONEY_ISSUE' ? '⚠️ MONEY ISSUE' : '🔴 NOT PAID'})
               </div>
             ) : (
-              <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
                 {friend.paymentHistory.map((tx, idx) => (
                   <div
                     key={tx.id}
@@ -173,9 +289,11 @@ export function FriendDetailsModal({
                 <MessageSquare className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-xs font-bold text-white">Send WhatsApp Reminder</p>
+                <p className="text-xs font-bold text-white">Send WhatsApp Notice</p>
                 <p className="text-[11px] text-slate-400">
-                  {friend.balance > 0
+                  {hasIssue
+                    ? 'Notify player regarding the flagged payment issue / dispute'
+                    : friend.balance > 0
                     ? `Remind to clear pending balance of ${formatCurrency(friend.balance, currency)}`
                     : 'Send payment receipt & confirmation'}
                 </p>
@@ -185,7 +303,7 @@ export function FriendDetailsModal({
               href={waLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-3.5 py-1.5 text-xs font-semibold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors whitespace-nowrap shadow-sm"
+              className="px-3.5 py-1.5 text-xs font-semibold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors whitespace-nowrap shadow-sm cursor-pointer"
             >
               Open WhatsApp
             </a>
@@ -210,9 +328,21 @@ export function FriendDetailsModal({
                 type="button"
                 onClick={() => {
                   onClose();
+                  onOpenMoneyIssue(friend);
+                }}
+                className="px-3 py-2 text-xs font-medium text-orange-400 hover:text-orange-300 bg-orange-950/30 hover:bg-orange-950/60 border border-orange-500/30 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>{hasIssue ? 'Money Issue' : 'Flag Issue'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
                   onOpenEdit(friend);
                 }}
-                className="px-3.5 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-1.5"
+                className="px-3.5 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <Edit3 className="w-3.5 h-3.5" />
                 <span>Edit</span>
@@ -224,7 +354,7 @@ export function FriendDetailsModal({
                   onClose();
                   onOpenAddPayment(friend);
                 }}
-                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors shadow-lg shadow-emerald-600/30 flex items-center gap-1.5"
+                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors shadow-lg shadow-emerald-600/30 flex items-center gap-1.5 cursor-pointer"
               >
                 <PlusCircle className="w-4 h-4" />
                 <span>Add Payment</span>

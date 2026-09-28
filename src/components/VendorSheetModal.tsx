@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { X, Copy, Check, Printer, Shirt, Download } from 'lucide-react';
-import { FriendJerseyOrder } from '../types/jersey';
-import { JERSEY_SIZES, exportToCSV } from '../utils/calculations';
+import React, { useState, useMemo } from 'react';
+import { X, Copy, Check, Printer, Shirt, Download, Filter } from 'lucide-react';
+import { FriendJerseyOrder, StatusFilter } from '../types/jersey';
+import { JERSEY_SIZES, exportToCSV, getStatusConfig } from '../utils/calculations';
 
 interface VendorSheetModalProps {
   isOpen: boolean;
@@ -17,18 +17,32 @@ export function VendorSheetModal({
   teamName,
 }: VendorSheetModalProps) {
   const [copied, setCopied] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'CLEARED' | 'NOT_PAID' | 'MONEY_ISSUE'>('ALL');
+
+  const displayedFriends = useMemo(() => {
+    if (statusFilter === 'CLEARED') {
+      return friends.filter((f) => f.status === 'PAID' || f.status === 'HALF_PAID');
+    }
+    if (statusFilter === 'NOT_PAID') {
+      return friends.filter((f) => f.status === 'NOT_PAID');
+    }
+    if (statusFilter === 'MONEY_ISSUE') {
+      return friends.filter((f) => f.status === 'MONEY_ISSUE');
+    }
+    return friends;
+  }, [friends, statusFilter]);
 
   if (!isOpen) return null;
 
   // Calculate size counts
   const sizeCounts = JERSEY_SIZES.reduce((acc, size) => {
-    acc[size] = friends.filter((f) => f.jerseySize === size).length;
+    acc[size] = displayedFriends.filter((f) => f.jerseySize === size).length;
     return acc;
   }, {} as Record<string, number>);
 
   const handleCopyText = () => {
     let text = `🏏 *${teamName.toUpperCase()} - JERSEY ORDER SPECS*\n`;
-    text += `Total Quantity: ${friends.length} jerseys\n\n`;
+    text += `Total Quantity: ${displayedFriends.length} jerseys\n\n`;
     text += `*SIZE BREAKDOWN:*\n`;
     JERSEY_SIZES.forEach((s) => {
       if (sizeCounts[s] > 0) {
@@ -37,8 +51,8 @@ export function VendorSheetModal({
     });
 
     text += `\n*PLAYER PRINTING LIST:*\n`;
-    friends.forEach((f, idx) => {
-      text += `${idx + 1}. ${f.jerseyName || f.name} | #${f.jerseyNumber} | Size: ${f.jerseySize} (${f.name})\n`;
+    displayedFriends.forEach((f, idx) => {
+      text += `${idx + 1}. ${f.jerseyName || f.name} | #${f.jerseyNumber} | Size: ${f.jerseySize} | [${f.status}] (${f.name})\n`;
     });
 
     navigator.clipboard.writeText(text);
@@ -110,13 +124,61 @@ export function VendorSheetModal({
 
           {/* Table of Jersey Prints */}
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
               <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                Sublimation Printing Roster ({friends.length} Players)
+                Sublimation Printing Roster ({displayedFriends.length} Jerseys)
               </h4>
-              <span className="text-xs text-slate-500">
-                Sorted by Jersey Number
-              </span>
+
+              {/* Status Filter for Printing */}
+              <div className="flex items-center gap-1 overflow-x-auto text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('ALL')}
+                  className={`px-2 py-0.5 rounded cursor-pointer ${
+                    statusFilter === 'ALL'
+                      ? 'bg-blue-600 text-white font-bold'
+                      : 'text-slate-400 hover:text-white bg-slate-800'
+                  }`}
+                >
+                  All ({friends.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('CLEARED')}
+                  className={`px-2 py-0.5 rounded cursor-pointer flex items-center gap-1 ${
+                    statusFilter === 'CLEARED'
+                      ? 'bg-emerald-600 text-white font-bold'
+                      : 'text-slate-400 hover:text-emerald-400 bg-slate-800'
+                  }`}
+                >
+                  <span>🟢/🟡</span>
+                  <span>Paid & Half ({friends.filter(f => f.status === 'PAID' || f.status === 'HALF_PAID').length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('NOT_PAID')}
+                  className={`px-2 py-0.5 rounded cursor-pointer flex items-center gap-1 ${
+                    statusFilter === 'NOT_PAID'
+                      ? 'bg-rose-600 text-white font-bold'
+                      : 'text-slate-400 hover:text-rose-400 bg-slate-800'
+                  }`}
+                >
+                  <span>🔴</span>
+                  <span>Unpaid ({friends.filter(f => f.status === 'NOT_PAID').length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('MONEY_ISSUE')}
+                  className={`px-2 py-0.5 rounded cursor-pointer flex items-center gap-1 ${
+                    statusFilter === 'MONEY_ISSUE'
+                      ? 'bg-orange-600 text-white font-bold'
+                      : 'text-slate-400 hover:text-orange-400 bg-slate-800'
+                  }`}
+                >
+                  <span>⚠️</span>
+                  <span>Issue ({friends.filter(f => f.status === 'MONEY_ISSUE').length})</span>
+                </button>
+              </div>
             </div>
 
             <div className="max-h-72 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950">
@@ -128,28 +190,38 @@ export function VendorSheetModal({
                     <th className="py-2.5 px-3">Back Print Name</th>
                     <th className="py-2.5 px-3 text-center">Jersey No.</th>
                     <th className="py-2.5 px-3 text-center">Size</th>
+                    <th className="py-2.5 px-3 text-center">Payment Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                  {friends.map((f, i) => (
-                    <tr key={f.id} className="hover:bg-slate-900/40">
-                      <td className="py-2 px-3 text-center text-slate-500 font-mono-num">
-                        {i + 1}
-                      </td>
-                      <td className="py-2 px-3 font-medium text-white">{f.name}</td>
-                      <td className="py-2 px-3 font-jersey font-bold text-amber-400 tracking-wider">
-                        {f.jerseyName || f.name}
-                      </td>
-                      <td className="py-2 px-3 text-center font-jersey font-extrabold text-amber-400">
-                        #{f.jerseyNumber}
-                      </td>
-                      <td className="py-2 px-3 text-center">
-                        <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 font-bold text-slate-200">
-                          {f.jerseySize}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {displayedFriends.map((f, i) => {
+                    const statusInfo = getStatusConfig(f.status);
+                    return (
+                      <tr key={f.id} className="hover:bg-slate-900/40">
+                        <td className="py-2 px-3 text-center text-slate-500 font-mono-num">
+                          {i + 1}
+                        </td>
+                        <td className="py-2 px-3 font-medium text-white">{f.name}</td>
+                        <td className="py-2 px-3 font-jersey font-bold text-amber-400 tracking-wider">
+                          {f.jerseyName || f.name}
+                        </td>
+                        <td className="py-2 px-3 text-center font-jersey font-extrabold text-amber-400">
+                          #{f.jerseyNumber}
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 font-bold text-slate-200">
+                            {f.jerseySize}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-center whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${statusInfo.badgeClass}`}>
+                            <span>{statusInfo.dot}</span>
+                            <span>{statusInfo.label}</span>
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

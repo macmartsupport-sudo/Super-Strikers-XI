@@ -1,6 +1,22 @@
 export type JerseySize = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL' | 'XXXL';
 
-export type PaymentStatus = 'PAID' | 'HALF_PAID' | 'NOT_PAID';
+export type PaymentStatus = 'PAID' | 'HALF_PAID' | 'NOT_PAID' | 'MONEY_ISSUE';
+
+export type MoneyIssueType =
+  | 'OVERPAID'
+  | 'UPI_FAILED_OR_PENDING'
+  | 'PAYMENT_DISPUTE'
+  | 'WRONG_ACCOUNT'
+  | 'REFUND_REQUESTED'
+  | 'OTHER_ISSUE';
+
+export interface MoneyIssueDetails {
+  hasIssue: boolean;
+  issueType: MoneyIssueType;
+  issueAmount?: number;
+  issueNote?: string;
+  flaggedAt?: string;
+}
 
 export interface PaymentTransaction {
   id: string;
@@ -25,6 +41,7 @@ export interface FriendJerseyOrder {
   createdAt: string;
   updatedAt: string;
   ownerId?: string;
+  moneyIssue?: MoneyIssueDetails;
   paymentHistory: PaymentTransaction[];
 }
 
@@ -36,5 +53,5 @@ export interface TeamSettings {
   ownerId?: string;
 }
 
-export type StatusFilter = 'ALL' | 'PAID' | 'HALF_PAID' | 'NOT_PAID';
+export type StatusFilter = 'ALL' | 'PAID' | 'HALF_PAID' | 'NOT_PAID' | 'MONEY_ISSUE';
 export type SortOption = 'balance_desc' | 'name_asc' | 'jersey_asc' | 'paid_desc' | 'created_desc';
