@@ -141,13 +141,9 @@ export function JerseyCard({
 
           <button
             type="button"
-            onClick={() => {
-              if (window.confirm(`Delete ${friend.name}?`)) {
-                onDelete(friend.id);
-              }
-            }}
+            onClick={() => onDelete(friend.id)}
             title="Delete"
-            className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors"
+            className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
           >
             <Trash2 className="w-4 h-4" />
           </button>

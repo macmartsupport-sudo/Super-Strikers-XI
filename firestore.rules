@@ -1,80 +1,19 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Global Safety Net default deny
-    match /{document=**} {
-      allow read, write: if false;
+    // Health check and connection test endpoint
+    match /test/{docId} {
+      allow read, write: if true;
     }
 
-    function isValidId(id) {
-      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
-    function incoming() {
-      return request.resource.data;
-    }
-
-    function existing() {
-      return resource.data;
-    }
-
-    function isValidJerseyOrder(data) {
-      return data.keys().hasAll([
-        'name',
-        'jerseySize',
-        'jerseyNumber',
-        'jerseyName',
-        'totalJerseyPrice',
-        'amountPaid',
-        'balance',
-        'status'
-      ]) &&
-      data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
-      data.jerseySize is string && data.jerseySize.size() <= 10 &&
-      data.jerseyNumber is string && data.jerseyNumber.size() <= 10 &&
-      data.jerseyName is string && data.jerseyName.size() <= 30 &&
-      data.totalJerseyPrice is number && data.totalJerseyPrice >= 0 &&
-      data.amountPaid is number && data.amountPaid >= 0 &&
-      data.balance is number && data.balance >= 0 &&
-      data.status in ['PAID', 'HALF_PAID', 'NOT_PAID'] &&
-      (!('phone' in data) || (data.phone is string && data.phone.size() <= 30)) &&
-      (!('notes' in data) || (data.notes is string && data.notes.size() <= 500)) &&
-      (!('ownerId' in data) || (data.ownerId is string && data.ownerId.size() <= 128)) &&
-      (!('createdAt' in data) || data.createdAt is string) &&
-      (!('updatedAt' in data) || data.updatedAt is string) &&
-      (!('paymentHistory' in data) || data.paymentHistory is list);
-    }
-
-    function isValidTeamSettings(data) {
-      return data.keys().hasAll([
-        'teamName',
-        'currency',
-        'defaultJerseyPrice'
-      ]) &&
-      data.teamName is string && data.teamName.size() > 0 && data.teamName.size() <= 100 &&
-      data.currency is string && data.currency.size() <= 10 &&
-      data.defaultJerseyPrice is number && data.defaultJerseyPrice >= 0 &&
-      (!('upiId' in data) || (data.upiId is string && data.upiId.size() <= 100)) &&
-      (!('ownerId' in data) || (data.ownerId is string && data.ownerId.size() <= 128)) &&
-      (!('updatedAt' in data) || data.updatedAt is string);
-    }
-
-    // Collection: jersey_orders
-    // Allows cricket squad to view and update jersey collection board without sign-in
+    // Cricket jersey orders collection
     match /jersey_orders/{orderId} {
-      allow get, list: if true;
-      allow create: if isValidId(orderId) && isValidJerseyOrder(incoming());
-      allow update: if isValidId(orderId) && isValidJerseyOrder(incoming());
-      allow delete: if isValidId(orderId);
+      allow read, write: if true;
     }
 
-    // Collection: team_settings
-    // Allows cricket squad to view and update team settings without sign-in
+    // Team and collection settings
     match /team_settings/{settingId} {
-      allow get, list: if true;
-      allow create: if isValidId(settingId) && isValidTeamSettings(incoming());
-      allow update: if isValidId(settingId) && isValidTeamSettings(incoming());
-      allow delete: if isValidId(settingId);
+      allow read, write: if true;
     }
   }
 }

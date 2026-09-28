@@ -31,6 +31,7 @@ import { AddPaymentModal } from './components/AddPaymentModal';
 import { FriendDetailsModal } from './components/FriendDetailsModal';
 import { VendorSheetModal } from './components/VendorSheetModal';
 import { TeamSettingsModal } from './components/TeamSettingsModal';
+import { ConfirmModal } from './components/ConfirmModal';
 
 export default function App() {
   const {
@@ -69,6 +70,8 @@ export default function App() {
 
   const [isVendorSheetOpen, setIsVendorSheetOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [friendToDelete, setFriendToDelete] = useState<FriendJerseyOrder | null>(null);
+  const [isErrorDismissed, setIsErrorDismissed] = useState(false);
 
   // Filtered & sorted list
   const filteredFriends = useMemo(() => {
@@ -161,6 +164,15 @@ export default function App() {
     exportToCSV(friends, settings.teamName);
   };
 
+  const handleRequestDelete = (id: string) => {
+    const friend = friends.find((f) => f.id === id);
+    if (friend) {
+      setFriendToDelete(friend);
+    } else {
+      deleteFriend(id);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col antialiased">
       {/* 3-Zone Clean Header */}
@@ -175,9 +187,16 @@ export default function App() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-8">
-        {cloudError && (
-          <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs flex items-center justify-between">
+        {cloudError && !isErrorDismissed && (
+          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-xs flex items-center justify-between animate-in fade-in">
             <span>{cloudError}</span>
+            <button
+              type="button"
+              onClick={() => setIsErrorDismissed(true)}
+              className="text-amber-400 hover:text-white font-semibold cursor-pointer ml-3 px-2 py-0.5 rounded bg-amber-500/20"
+            >
+              Dismiss
+            </button>
           </div>
         )}
 
@@ -395,7 +414,7 @@ export default function App() {
                   onViewDetails={handleOpenDetails}
                   onAddPayment={handleOpenAddPayment}
                   onEdit={handleOpenEdit}
-                  onDelete={deleteFriend}
+                  onDelete={handleRequestDelete}
                   onQuickMarkPaid={quickMarkPaid}
                 />
               </div>
@@ -418,7 +437,7 @@ export default function App() {
                     onViewDetails={handleOpenDetails}
                     onAddPayment={handleOpenAddPayment}
                     onEdit={handleOpenEdit}
-                    onDelete={deleteFriend}
+                    onDelete={handleRequestDelete}
                   />
                 ))}
               </div>
@@ -435,7 +454,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setIsVendorSheetOpen(true)}
-              className="hover:text-white transition-colors"
+              className="hover:text-white transition-colors cursor-pointer"
             >
               Vendor Order Sheet
             </button>
@@ -443,7 +462,7 @@ export default function App() {
             <button
               type="button"
               onClick={handleExportCSV}
-              className="hover:text-white transition-colors"
+              className="hover:text-white transition-colors cursor-pointer"
             >
               Export CSV
             </button>
@@ -451,7 +470,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setIsSettingsOpen(true)}
-              className="hover:text-white transition-colors"
+              className="hover:text-white transition-colors cursor-pointer"
             >
               Settings
             </button>
@@ -493,7 +512,7 @@ export default function App() {
           setIsDetailsOpen(false);
           handleOpenEdit(f);
         }}
-        onDelete={deleteFriend}
+        onDelete={handleRequestDelete}
       />
 
       <VendorSheetModal
@@ -510,6 +529,27 @@ export default function App() {
         onSaveSettings={updateTeamSettings}
         onResetSampleData={resetSampleData}
         onClearAll={clearAllData}
+      />
+
+      {/* In-app safe deletion confirmation */}
+      <ConfirmModal
+        isOpen={Boolean(friendToDelete)}
+        title="Remove Friend from Order"
+        message={
+          friendToDelete
+            ? `Are you sure you want to remove "${friendToDelete.name}" (${friendToDelete.jerseyName} #${friendToDelete.jerseyNumber}) from the cricket jersey order? This action cannot be undone.`
+            : ''
+        }
+        confirmLabel="Yes, Remove"
+        cancelLabel="Cancel"
+        variant="danger"
+        onConfirm={() => {
+          if (friendToDelete) {
+            deleteFriend(friendToDelete.id);
+            setFriendToDelete(null);
+          }
+        }}
+        onCancel={() => setFriendToDelete(null)}
       />
     </div>
   );

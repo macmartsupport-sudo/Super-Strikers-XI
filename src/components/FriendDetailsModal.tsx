@@ -196,12 +196,10 @@ export function FriendDetailsModal({
             <button
               type="button"
               onClick={() => {
-                if (window.confirm(`Delete ${friend.name} from the jersey order list?`)) {
-                  onDelete(friend.id);
-                  onClose();
-                }
+                onDelete(friend.id);
+                onClose();
               }}
-              className="px-3 py-2 text-xs font-medium text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-lg transition-colors flex items-center gap-1.5"
+              className="px-3 py-2 text-xs font-medium text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
             >
               <Trash2 className="w-4 h-4" />
               <span>Delete</span>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings, RotateCcw, Trash2, CheckCircle2 } from 'lucide-react';
+import { X, Settings, RotateCcw, Trash2, AlertTriangle } from 'lucide-react';
 import { TeamSettings } from '../types/jersey';
 
 interface TeamSettingsModalProps {
@@ -23,6 +23,7 @@ export function TeamSettingsModal({
   const [currency, setCurrency] = useState(settings.currency);
   const [defaultJerseyPrice, setDefaultJerseyPrice] = useState(settings.defaultJerseyPrice);
   const [upiId, setUpiId] = useState(settings.upiId || '');
+  const [confirmAction, setConfirmAction] = useState<'reset' | 'clear' | null>(null);
 
   if (!isOpen) return null;
 
@@ -48,7 +49,7 @@ export function TeamSettingsModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -120,48 +121,93 @@ export function TeamSettingsModal({
             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
               Data Management
             </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm('Reset list to sample cricket squad?')) {
-                    onResetSampleData();
-                    onClose();
-                  }
-                }}
-                className="flex-1 px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 hover:text-white rounded-lg transition-colors flex items-center justify-center gap-1.5"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reset Sample Team</span>
-              </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm('Clear all friend jersey entries?')) {
-                    onClearAll();
-                    onClose();
-                  }
-                }}
-                className="px-3 py-1.5 text-xs font-medium text-rose-400 bg-rose-950/30 hover:bg-rose-950/60 border border-rose-500/20 rounded-lg transition-colors flex items-center gap-1.5"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Clear All</span>
-              </button>
-            </div>
+            {confirmAction === 'reset' ? (
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2">
+                <p className="text-xs text-amber-300 font-medium">
+                  Reset team roster to sample cricket squad?
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onResetSampleData();
+                      setConfirmAction(null);
+                      onClose();
+                    }}
+                    className="flex-1 py-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Yes, Reset Squad
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmAction(null)}
+                    className="px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 hover:text-white rounded-lg transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : confirmAction === 'clear' ? (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 space-y-2">
+                <p className="text-xs text-rose-300 font-medium">
+                  Clear all players and orders from the database?
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClearAll();
+                      setConfirmAction(null);
+                      onClose();
+                    }}
+                    className="flex-1 py-1.5 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-500 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Yes, Clear All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmAction(null)}
+                    className="px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 hover:text-white rounded-lg transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmAction('reset')}
+                  className="flex-1 px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 hover:text-white rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset Sample Team</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setConfirmAction('clear')}
+                  className="px-3 py-1.5 text-xs font-medium text-rose-400 bg-rose-950/30 hover:bg-rose-950/60 border border-rose-500/20 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Clear All</span>
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 rounded-lg hover:bg-slate-700"
+              className="px-4 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 rounded-lg hover:bg-slate-700 cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-500 transition-colors shadow-md"
+              className="px-5 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-500 transition-colors shadow-md cursor-pointer"
             >
               Save Settings
             </button>

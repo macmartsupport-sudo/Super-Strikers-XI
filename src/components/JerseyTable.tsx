@@ -174,13 +174,9 @@ export function JerseyTable({
                     {/* Delete */}
                     <button
                       type="button"
-                      onClick={() => {
-                        if (window.confirm(`Delete ${friend.name} from the list?`)) {
-                          onDelete(friend.id);
-                        }
-                      }}
+                      onClick={() => onDelete(friend.id)}
                       title="Delete"
-                      className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors"
+                      className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
