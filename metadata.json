@@ -1,0 +1,6 @@
+{
+  "name": "Cricket Jersey Payment Tracker",
+  "description": "Premium cricket team jersey order and money collection tracker with automated balance calculation, size breakdown, and payment logs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

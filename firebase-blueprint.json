@@ -1,0 +1,134 @@
+{
+  "entities": {
+    "JerseyOrder": {
+      "title": "JerseyOrder",
+      "description": "A cricket player jersey order and payment record",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Friend's full name",
+          "maxLength": 100
+        },
+        "phone": {
+          "type": "string",
+          "description": "Contact phone number for reminders",
+          "maxLength": 30
+        },
+        "jerseySize": {
+          "type": "string",
+          "description": "Jersey size",
+          "enum": ["XS", "S", "M", "L", "XL", "XXL", "XXXL"]
+        },
+        "jerseyNumber": {
+          "type": "string",
+          "description": "Back print jersey number",
+          "maxLength": 10
+        },
+        "jerseyName": {
+          "type": "string",
+          "description": "Back print player name",
+          "maxLength": 30
+        },
+        "totalJerseyPrice": {
+          "type": "number",
+          "description": "Total price for the jersey"
+        },
+        "amountPaid": {
+          "type": "number",
+          "description": "Total amount paid so far"
+        },
+        "balance": {
+          "type": "number",
+          "description": "Remaining unpaid balance"
+        },
+        "status": {
+          "type": "string",
+          "description": "Calculated payment status",
+          "enum": ["PAID", "HALF_PAID", "NOT_PAID"]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional notes or comments",
+          "maxLength": 500
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "User UID who created this order",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of creation",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last update",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "name",
+        "jerseySize",
+        "jerseyNumber",
+        "jerseyName",
+        "totalJerseyPrice",
+        "amountPaid",
+        "balance",
+        "status"
+      ]
+    },
+    "TeamSettings": {
+      "title": "TeamSettings",
+      "description": "Customizable team configurations and preferences",
+      "type": "object",
+      "properties": {
+        "teamName": {
+          "type": "string",
+          "description": "Name of the cricket team or squad",
+          "maxLength": 100
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency symbol",
+          "maxLength": 10
+        },
+        "defaultJerseyPrice": {
+          "type": "number",
+          "description": "Default price for jerseys"
+        },
+        "upiId": {
+          "type": "string",
+          "description": "Captain UPI ID for payments",
+          "maxLength": 100
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "User UID who owns these settings",
+          "maxLength": 128
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last update",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "teamName",
+        "currency",
+        "defaultJerseyPrice"
+      ]
+    }
+  },
+  "firestore": {
+    "/jersey_orders/{orderId}": {
+      "schema": "JerseyOrder",
+      "description": "Collection of all player jersey orders"
+    },
+    "/team_settings/{settingId}": {
+      "schema": "TeamSettings",
+      "description": "Configurations for the cricket team"
+    }
+  }
+}
