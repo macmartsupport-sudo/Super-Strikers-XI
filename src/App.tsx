@@ -392,8 +392,14 @@ export default function App() {
           {/* Friends List Rendering */}
           {friends.length === 0 ? (
             <div className="text-center py-16 px-4 bg-slate-900/40 rounded-2xl border border-dashed border-slate-800 space-y-4">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center">
-                <Shirt className="w-8 h-8 text-blue-400" />
+              <div className="relative w-20 h-20 mx-auto">
+                <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-amber-500 rounded-2xl blur opacity-50"></div>
+                <img
+                  src="/src/assets/images/cricket_jersey_logo_1790667442860.jpg"
+                  alt={`${settings.teamName} Emblem`}
+                  referrerPolicy="no-referrer"
+                  className="relative w-20 h-20 rounded-2xl object-cover border border-slate-700 shadow-xl"
+                />
               </div>
               <div className="max-w-sm mx-auto space-y-1">
                 <h3 className="text-base font-bold text-white">No Players in Jersey Order</h3>
@@ -488,7 +494,15 @@ export default function App() {
       {/* Footer */}
       <footer className="border-t border-slate-800/80 bg-slate-950 py-6 text-center text-xs text-slate-400">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <span>{settings.teamName} · Official Cricket Jersey Payment Tracker</span>
+          <div className="flex items-center gap-2">
+            <img
+              src="/src/assets/images/cricket_jersey_logo_1790667442860.jpg"
+              alt="Logo icon"
+              referrerPolicy="no-referrer"
+              className="w-5 h-5 rounded-md object-cover border border-slate-700"
+            />
+            <span>{settings.teamName} · Official Cricket Jersey Payment Tracker</span>
+          </div>
           <div className="flex items-center gap-4">
             <button
               type="button"

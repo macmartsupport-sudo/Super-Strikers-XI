@@ -42,11 +42,11 @@ export function calculatePaymentStatus(
 }
 
 /**
- * Formats monetary amounts with user selected currency
+ * Formats monetary amounts with Rs currency symbol
  */
-export function formatCurrency(amount: number, currency = '₹'): string {
+export function formatCurrency(amount: number, _currency = 'Rs'): string {
   const safe = Number(amount) || 0;
-  return `${currency}${safe.toLocaleString('en-IN')}`;
+  return `Rs ${safe.toLocaleString('en-IN')}`;
 }
 
 export const JERSEY_SIZES: JerseySize[] = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];

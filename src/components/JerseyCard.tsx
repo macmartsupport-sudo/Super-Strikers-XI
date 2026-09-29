@@ -189,7 +189,7 @@ export function JerseyCard({
         <button
           type="button"
           onClick={() => onQuickSetStatus && onQuickSetStatus(friend.id, 'NOT_PAID')}
-          title="Mark ₹0 Not Paid"
+          title="Mark Rs 0 Not Paid"
           className={`py-1 px-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
             friend.status === 'NOT_PAID'
               ? 'bg-rose-500/25 text-rose-300 border border-rose-500/50 shadow-sm'

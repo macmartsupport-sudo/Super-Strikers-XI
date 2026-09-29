@@ -1,4 +1,4 @@
-import { Shirt, Plus, Download, FileSpreadsheet, Settings, Cloud, Loader2 } from 'lucide-react';
+import { Plus, Download, FileSpreadsheet, Settings, Cloud, Loader2 } from 'lucide-react';
 import { TeamSettings } from '../types/jersey';
 
 interface HeaderProps {
@@ -25,16 +25,23 @@ export function Header({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         {/* Zone 1: Single text element wordmark */}
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
-            <Shirt className="w-5 h-5 text-amber-300" />
+          <div className="relative group flex-shrink-0">
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-amber-500 rounded-xl blur-[2px] opacity-60 group-hover:opacity-100 transition duration-300"></div>
+            <img
+              src="/src/assets/images/cricket_jersey_logo_1790667442860.jpg"
+              alt={`${settings.teamName} Logo`}
+              referrerPolicy="no-referrer"
+              className="relative w-10 h-10 rounded-xl object-cover border border-slate-700/80 shadow-md shadow-blue-900/30"
+            />
           </div>
           <div>
             <h1 className="text-base sm:text-lg font-extrabold text-white tracking-tight flex items-center gap-2">
               <span>{settings.teamName}</span>
-              <span className="hidden sm:inline-block text-[11px] font-semibold text-slate-400 bg-slate-850 px-2 py-0.5 rounded-full border border-slate-700/60 font-mono">
+              <span className="hidden sm:inline-block text-[11px] font-semibold text-amber-400/90 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/30 font-mono">
                 Kit '26
               </span>
             </h1>
+            <p className="text-[10px] text-slate-400 hidden sm:block leading-none mt-0.5">Jersey Orders & Payment Tracker</p>
           </div>
         </div>
 

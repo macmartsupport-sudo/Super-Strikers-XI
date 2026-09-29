@@ -19,7 +19,7 @@ const SETTINGS_DOC_ID = 'main_team_settings';
 
 const DEFAULT_SETTINGS: TeamSettings = {
   teamName: 'Super Strikers XI',
-  currency: '₹',
+  currency: 'Rs',
   defaultJerseyPrice: 1200,
   upiId: 'captain@upi',
 };
@@ -46,7 +46,12 @@ export function useJerseyTracker() {
     try {
       const stored = localStorage.getItem(STORAGE_KEY_SETTINGS);
       if (stored) {
-        return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+        const parsed = JSON.parse(stored);
+        return {
+          ...DEFAULT_SETTINGS,
+          ...parsed,
+          currency: 'Rs',
+        };
       }
     } catch (e) {
       console.error('Failed to load settings from localStorage', e);
@@ -85,8 +90,20 @@ export function useJerseyTracker() {
       (error) => {
         setIsCloudSyncing(false);
         setIsLiveConnected(false);
-        setCloudError('Unable to sync live with Cloud Firestore. Using local storage.');
-        handleFirestoreError(error, OperationType.GET, 'jersey_orders');
+        const errCode = (error as { code?: string })?.code;
+        const errMsg = error instanceof Error ? error.message : String(error);
+        const isOfflineOrUnavailable =
+          errCode === 'unavailable' ||
+          errMsg.includes('unavailable') ||
+          errMsg.includes('offline') ||
+          errMsg.includes('Could not reach Cloud Firestore backend');
+
+        if (!isOfflineOrUnavailable) {
+          setCloudError('Unable to sync live with Cloud Firestore. Using local storage.');
+          handleFirestoreError(error, OperationType.GET, 'jersey_orders');
+        } else {
+          console.warn('Firestore is connecting or operating in offline mode.');
+        }
       }
     );
 
@@ -97,19 +114,35 @@ export function useJerseyTracker() {
       (docSnap) => {
         if (docSnap.exists()) {
           const cloudSettings = docSnap.data() as TeamSettings;
-          setSettings((prev) => ({ ...prev, ...cloudSettings }));
+          setSettings((prev) => ({
+            ...prev,
+            ...cloudSettings,
+            currency: 'Rs',
+          }));
+          if (cloudSettings.currency !== 'Rs') {
+            setDoc(settingsDocRef, { ...cloudSettings, currency: 'Rs' }, { merge: true }).catch(() => {});
+          }
         } else {
           // Initialize settings document in cloud
           setDoc(settingsDocRef, {
             ...settings,
+            currency: 'Rs',
             updatedAt: new Date().toISOString(),
           }).catch((err) => {
-            handleFirestoreError(err, OperationType.WRITE, `team_settings/${SETTINGS_DOC_ID}`);
+            const errCode = (err as { code?: string })?.code;
+            const errMsg = err instanceof Error ? err.message : String(err);
+            if (errCode !== 'unavailable' && !errMsg.includes('unavailable')) {
+              handleFirestoreError(err, OperationType.WRITE, `team_settings/${SETTINGS_DOC_ID}`);
+            }
           });
         }
       },
       (error) => {
-        handleFirestoreError(error, OperationType.GET, `team_settings/${SETTINGS_DOC_ID}`);
+        const errCode = (error as { code?: string })?.code;
+        const errMsg = error instanceof Error ? error.message : String(error);
+        if (errCode !== 'unavailable' && !errMsg.includes('unavailable')) {
+          handleFirestoreError(error, OperationType.GET, `team_settings/${SETTINGS_DOC_ID}`);
+        }
       }
     );
 
@@ -137,18 +170,43 @@ export function useJerseyTracker() {
     }
   }, [settings]);
 
+  // Safe Firestore write helper that ensures offline/unavailable states do not cause fatal errors
+  const safeFirestoreWrite = async (
+    fn: () => Promise<void>,
+    operationType: OperationType,
+    path: string
+  ) => {
+    try {
+      await fn();
+    } catch (error) {
+      const errCode = (error as { code?: string })?.code;
+      const errMsg = error instanceof Error ? error.message : String(error);
+      const isOfflineOrUnavailable =
+        errCode === 'unavailable' ||
+        errMsg.includes('unavailable') ||
+        errMsg.includes('offline') ||
+        errMsg.includes('Could not reach Cloud Firestore backend');
+      if (!isOfflineOrUnavailable) {
+        handleFirestoreError(error, operationType, path);
+      } else {
+        console.warn(`Firestore write queued in local cache for ${path}:`, errMsg);
+      }
+    }
+  };
+
   // Seed sample team into Firestore
   const seedInitialSquadToCloud = async (ordersToSync: FriendJerseyOrder[]) => {
-    try {
-      for (const friend of ordersToSync) {
-        const orderRef = doc(db, 'jersey_orders', friend.id);
-        await setDoc(orderRef, {
-          ...friend,
-          updatedAt: new Date().toISOString(),
-        });
-      }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'jersey_orders');
+    for (const friend of ordersToSync) {
+      const orderRef = doc(db, 'jersey_orders', friend.id);
+      await safeFirestoreWrite(
+        () =>
+          setDoc(orderRef, {
+            ...friend,
+            updatedAt: new Date().toISOString(),
+          }),
+        OperationType.WRITE,
+        `jersey_orders/${friend.id}`
+      );
     }
   };
 
@@ -206,11 +264,11 @@ export function useJerseyTracker() {
     setFriends((prev) => [newFriend, ...prev]);
 
     // Save directly to Firestore
-    try {
-      await setDoc(doc(db, 'jersey_orders', friendId), newFriend);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `jersey_orders/${friendId}`);
-    }
+    await safeFirestoreWrite(
+      () => setDoc(doc(db, 'jersey_orders', friendId), newFriend),
+      OperationType.WRITE,
+      `jersey_orders/${friendId}`
+    );
 
     return newFriend;
   };
@@ -262,11 +320,11 @@ export function useJerseyTracker() {
     );
 
     if (updatedFriend) {
-      try {
-        await setDoc(doc(db, 'jersey_orders', id), updatedFriend);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `jersey_orders/${id}`);
-      }
+      await safeFirestoreWrite(
+        () => setDoc(doc(db, 'jersey_orders', id), updatedFriend!),
+        OperationType.WRITE,
+        `jersey_orders/${id}`
+      );
     }
   };
 
@@ -295,11 +353,11 @@ export function useJerseyTracker() {
     );
 
     if (updatedFriend) {
-      try {
-        await setDoc(doc(db, 'jersey_orders', friendId), updatedFriend);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `jersey_orders/${friendId}`);
-      }
+      await safeFirestoreWrite(
+        () => setDoc(doc(db, 'jersey_orders', friendId), updatedFriend!),
+        OperationType.WRITE,
+        `jersey_orders/${friendId}`
+      );
     }
   };
 
@@ -307,11 +365,11 @@ export function useJerseyTracker() {
   const deleteFriend = async (id: string) => {
     setFriends((prev) => prev.filter((item) => item.id !== id));
 
-    try {
-      await deleteDoc(doc(db, 'jersey_orders', id));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `jersey_orders/${id}`);
-    }
+    await safeFirestoreWrite(
+      () => deleteDoc(doc(db, 'jersey_orders', id)),
+      OperationType.DELETE,
+      `jersey_orders/${id}`
+    );
   };
 
   // Record an additional payment installment
@@ -361,11 +419,11 @@ export function useJerseyTracker() {
     );
 
     if (updatedFriend) {
-      try {
-        await setDoc(doc(db, 'jersey_orders', friendId), updatedFriend);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `jersey_orders/${friendId}`);
-      }
+      await safeFirestoreWrite(
+        () => setDoc(doc(db, 'jersey_orders', friendId), updatedFriend!),
+        OperationType.WRITE,
+        `jersey_orders/${friendId}`
+      );
     }
   };
 
@@ -453,11 +511,11 @@ export function useJerseyTracker() {
     );
 
     if (updatedFriend) {
-      try {
-        await setDoc(doc(db, 'jersey_orders', friendId), updatedFriend);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `jersey_orders/${friendId}`);
-      }
+      await safeFirestoreWrite(
+        () => setDoc(doc(db, 'jersey_orders', friendId), updatedFriend!),
+        OperationType.WRITE,
+        `jersey_orders/${friendId}`
+      );
     }
   };
 
@@ -496,11 +554,11 @@ export function useJerseyTracker() {
     );
 
     if (updatedFriend) {
-      try {
-        await setDoc(doc(db, 'jersey_orders', friendId), updatedFriend);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `jersey_orders/${friendId}`);
-      }
+      await safeFirestoreWrite(
+        () => setDoc(doc(db, 'jersey_orders', friendId), updatedFriend!),
+        OperationType.WRITE,
+        `jersey_orders/${friendId}`
+      );
     }
   };
 
@@ -511,27 +569,28 @@ export function useJerseyTracker() {
 
   const clearAllData = async () => {
     for (const f of friends) {
-      try {
-        await deleteDoc(doc(db, 'jersey_orders', f.id));
-      } catch (e) {
-        // continue
-      }
+      await safeFirestoreWrite(
+        () => deleteDoc(doc(db, 'jersey_orders', f.id)),
+        OperationType.DELETE,
+        `jersey_orders/${f.id}`
+      );
     }
     setFriends([]);
   };
 
   const updateTeamSettings = async (newSettings: Partial<TeamSettings>) => {
-    const updated = { ...settings, ...newSettings };
+    const updated: TeamSettings = { ...settings, ...newSettings, currency: 'Rs' };
     setSettings(updated);
 
-    try {
-      await setDoc(doc(db, 'team_settings', SETTINGS_DOC_ID), {
-        ...updated,
-        updatedAt: new Date().toISOString(),
-      });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `team_settings/${SETTINGS_DOC_ID}`);
-    }
+    await safeFirestoreWrite(
+      () =>
+        setDoc(doc(db, 'team_settings', SETTINGS_DOC_ID), {
+          ...updated,
+          updatedAt: new Date().toISOString(),
+        }),
+      OperationType.WRITE,
+      `team_settings/${SETTINGS_DOC_ID}`
+    );
   };
 
   return {

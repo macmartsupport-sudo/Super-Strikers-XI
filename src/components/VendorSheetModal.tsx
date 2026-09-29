@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Copy, Check, Printer, Shirt, Download, Filter } from 'lucide-react';
+import { X, Copy, Check, Printer, Download, Filter } from 'lucide-react';
 import { FriendJerseyOrder, StatusFilter } from '../types/jersey';
 import { JERSEY_SIZES, exportToCSV, getStatusConfig } from '../utils/calculations';
 
@@ -69,10 +69,13 @@ export function VendorSheetModal({
       <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden my-8">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/90 no-print">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
-              <Shirt className="w-5 h-5" />
-            </div>
+          <div className="flex items-center gap-3">
+            <img
+              src="/src/assets/images/cricket_jersey_logo_1790667442860.jpg"
+              alt="Team Emblem"
+              referrerPolicy="no-referrer"
+              className="w-10 h-10 rounded-xl object-cover border border-slate-700 shadow-md shadow-blue-900/30 flex-shrink-0"
+            />
             <div>
               <h3 className="text-base font-bold text-white">
                 Vendor Order Sheet & Size Summary

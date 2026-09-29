@@ -171,7 +171,7 @@ export function Dashboard({
             {notPaidCount}
           </div>
           <div className="text-[11px] text-rose-400/80 mt-0.5">
-            Pending ₹0 advance
+            Pending Rs 0 advance
           </div>
         </button>
 

@@ -369,11 +369,11 @@ export function AddEditFriendModal({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Total Jersey Price ({currency}) <span className="text-rose-400">*</span>
+                  Total Jersey Price (Rs) <span className="text-rose-400">*</span>
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-xs text-slate-500 font-mono-num">
-                    {currency}
+                    Rs
                   </span>
                   <input
                     type="number"
@@ -382,18 +382,18 @@ export function AddEditFriendModal({
                     required
                     value={totalPrice}
                     onChange={(e) => setTotalPrice(Number(e.target.value) || 0)}
-                    className="w-full pl-8 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white font-mono-num focus:outline-none focus:border-blue-500"
+                    className="w-full pl-10 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white font-mono-num focus:outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Amount Paid ({currency}) <span className="text-rose-400">*</span>
+                  Amount Paid (Rs) <span className="text-rose-400">*</span>
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-xs text-slate-500 font-mono-num">
-                    {currency}
+                    Rs
                   </span>
                   <input
                     type="number"
@@ -401,7 +401,7 @@ export function AddEditFriendModal({
                     step="1"
                     value={amountPaid}
                     onChange={(e) => setAmountPaid(Number(e.target.value) || 0)}
-                    className="w-full pl-8 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white font-mono-num focus:outline-none focus:border-blue-500"
+                    className="w-full pl-10 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white font-mono-num focus:outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
@@ -481,7 +481,7 @@ export function AddEditFriendModal({
 
                     <div>
                       <label className="block text-[11px] font-medium text-slate-300 mb-1">
-                        Disputed / Issue Amount ({currency})
+                        Disputed / Issue Amount (Rs)
                       </label>
                       <input
                         type="number"

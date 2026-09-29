@@ -119,11 +119,11 @@ export function AddPaymentModal({
           {/* Input: New Payment Amount */}
           <div className="space-y-2">
             <label className="block text-xs font-semibold text-slate-200">
-              New Payment ({currency}) <span className="text-rose-400">*</span>
+              New Payment (Rs) <span className="text-rose-400">*</span>
             </label>
             <div className="relative">
               <span className="absolute left-3.5 top-3 text-sm text-slate-400 font-mono-num">
-                {currency}
+                Rs
               </span>
               <input
                 type="number"
@@ -137,7 +137,7 @@ export function AddPaymentModal({
                   setError(null);
                   setPaymentAmount(e.target.value === '' ? '' : Number(e.target.value));
                 }}
-                className="w-full pl-9 pr-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-lg font-bold text-white font-mono-num focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                className="w-full pl-12 pr-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-lg font-bold text-white font-mono-num focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
               />
             </div>
 
@@ -149,7 +149,7 @@ export function AddPaymentModal({
                   onClick={() => setPaymentAmount(friend.balance)}
                   className="px-2.5 py-1 text-xs font-semibold text-emerald-300 bg-emerald-950/70 border border-emerald-500/50 rounded-lg hover:bg-emerald-900/60 transition-colors cursor-pointer"
                 >
-                  🟢 Clear Full Balance ({formatCurrency(friend.balance, currency)})
+                  🟢 Clear Full Balance ({formatCurrency(friend.balance)})
                 </button>
               )}
               {friend.amountPaid === 0 && friend.totalJerseyPrice > 0 && (
@@ -158,7 +158,7 @@ export function AddPaymentModal({
                   onClick={() => setPaymentAmount(Math.round(friend.totalJerseyPrice / 2))}
                   className="px-2.5 py-1 text-xs font-semibold text-amber-300 bg-amber-950/70 border border-amber-500/50 rounded-lg hover:bg-amber-900/60 transition-colors cursor-pointer"
                 >
-                  🟡 50% Half Paid ({formatCurrency(Math.round(friend.totalJerseyPrice / 2), currency)})
+                  🟡 50% Half Paid ({formatCurrency(Math.round(friend.totalJerseyPrice / 2))})
                 </button>
               )}
               <button
@@ -166,21 +166,21 @@ export function AddPaymentModal({
                 onClick={() => setPaymentAmount(500)}
                 className="px-2.5 py-1 text-xs font-medium text-slate-300 bg-slate-800 border border-slate-700 rounded-lg hover:text-white transition-colors cursor-pointer"
               >
-                + {currency}500
+                + Rs 500
               </button>
               <button
                 type="button"
                 onClick={() => setPaymentAmount(1000)}
                 className="px-2.5 py-1 text-xs font-medium text-slate-300 bg-slate-800 border border-slate-700 rounded-lg hover:text-white transition-colors cursor-pointer"
               >
-                + {currency}1,000
+                + Rs 1,000
               </button>
               <button
                 type="button"
                 onClick={() => setPaymentAmount(200)}
                 className="px-2.5 py-1 text-xs font-medium text-slate-300 bg-slate-800 border border-slate-700 rounded-lg hover:text-white transition-colors cursor-pointer"
               >
-                + {currency}200
+                + Rs 200
               </button>
             </div>
           </div>

@@ -20,7 +20,7 @@ export function TeamSettingsModal({
   onClearAll,
 }: TeamSettingsModalProps) {
   const [teamName, setTeamName] = useState(settings.teamName);
-  const [currency, setCurrency] = useState(settings.currency);
+  const currency = 'Rs';
   const [defaultJerseyPrice, setDefaultJerseyPrice] = useState(settings.defaultJerseyPrice);
   const [upiId, setUpiId] = useState(settings.upiId || '');
   const [confirmAction, setConfirmAction] = useState<'reset' | 'clear' | null>(null);
@@ -73,20 +73,12 @@ export function TeamSettingsModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1">
-                Currency Symbol
+                Currency
               </label>
-              <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500"
-              >
-                <option value="₹">₹ (INR Rupee)</option>
-                <option value="Rs. ">Rs. (Rupees)</option>
-                <option value="$">$ (USD)</option>
-                <option value="£">£ (GBP)</option>
-                <option value="€">€ (EUR)</option>
-                <option value="AED ">AED (Dirham)</option>
-              </select>
+              <div className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-emerald-400 font-semibold flex items-center justify-between">
+                <span>Rs (Rupees)</span>
+                <span className="text-[10px] text-slate-400 uppercase tracking-wider font-mono">Fixed: Rs</span>
+              </div>
             </div>
 
             <div>

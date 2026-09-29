@@ -148,11 +148,11 @@ export function MoneyIssueModal({
           {/* Issue Amount */}
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-1">
-              Amount in Question ({currency})
+              Amount in Question (Rs)
             </label>
             <div className="relative">
               <span className="absolute left-3 top-2.5 text-xs text-slate-500 font-mono-num">
-                {currency}
+                Rs
               </span>
               <input
                 type="number"
@@ -160,7 +160,7 @@ export function MoneyIssueModal({
                 value={issueAmount}
                 onChange={(e) => setIssueAmount(e.target.value === '' ? '' : Number(e.target.value))}
                 placeholder="e.g. 1200"
-                className="w-full pl-8 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white font-mono-num focus:outline-none focus:border-orange-500"
+                className="w-full pl-10 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white font-mono-num focus:outline-none focus:border-orange-500"
               />
             </div>
             <span className="text-[10px] text-slate-500 mt-1 block">

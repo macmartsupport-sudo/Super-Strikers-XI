@@ -154,7 +154,7 @@ export function JerseyTable({
                       >
                         <option value="PAID" className="bg-slate-900 text-emerald-400 font-bold">🟢 PAID (Full)</option>
                         <option value="HALF_PAID" className="bg-slate-900 text-amber-400 font-bold">🟡 HALF PAID (50%)</option>
-                        <option value="NOT_PAID" className="bg-slate-900 text-rose-400 font-bold">🔴 NOT PAID (₹0)</option>
+                        <option value="NOT_PAID" className="bg-slate-900 text-rose-400 font-bold">🔴 NOT PAID (Rs 0)</option>
                         <option value="MONEY_ISSUE" className="bg-slate-900 text-orange-400 font-bold">⚠️ MONEY ISSUE...</option>
                       </select>
                       <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-1.5 opacity-60">
