@@ -178,14 +178,35 @@ export function JerseyTable({
                 {/* Actions */}
                 <td className="py-3 px-4 text-right whitespace-nowrap">
                   <div className="flex items-center justify-end gap-1">
-                    {/* Add Payment Button */}
+                    {/* Direct 1-Click Paid Button */}
+                    {friend.balance > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => onQuickSetStatus && onQuickSetStatus(friend.id, 'PAID')}
+                        title={`Mark ${friend.name} as Paid in full`}
+                        className="px-2.5 py-1 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:scale-95 rounded-lg transition-all shadow-sm shadow-emerald-900/30 flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>✓ Paid</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onQuickSetStatus && onQuickSetStatus(friend.id, 'NOT_PAID')}
+                        title="Fully Paid. Click to toggle unpaid if needed."
+                        className="px-2 py-0.5 text-[10px] font-bold text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 rounded-lg cursor-pointer hover:bg-rose-950/40 hover:text-rose-300 hover:border-rose-500/40 transition-colors"
+                      >
+                        ✓ Paid
+                      </button>
+                    )}
+
+                    {/* Add Partial Payment Button */}
                     <button
                       type="button"
                       onClick={() => onAddPayment(friend)}
                       title="Add Payment"
-                      className="px-2.5 py-1 text-[11px] font-semibold text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/40 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                      className="px-2 py-1 text-[11px] font-medium text-slate-300 bg-slate-800 hover:text-white hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
                     >
-                      <PlusCircle className="w-3.5 h-3.5" />
+                      <PlusCircle className="w-3.5 h-3.5 text-blue-400" />
                       <span>+ Pay</span>
                     </button>
 

@@ -170,6 +170,17 @@ export function useJerseyTracker() {
     }
   }, [settings]);
 
+  // Sanitize object for Firestore to guarantee no undefined fields are passed
+  const sanitizeForFirestore = <T extends Record<string, any>>(obj: T): T => {
+    const clean: Record<string, any> = {};
+    for (const [key, val] of Object.entries(obj)) {
+      if (val !== undefined) {
+        clean[key] = val;
+      }
+    }
+    return clean as T;
+  };
+
   // Safe Firestore write helper that ensures offline/unavailable states do not cause fatal errors
   const safeFirestoreWrite = async (
     fn: () => Promise<void>,
@@ -265,7 +276,7 @@ export function useJerseyTracker() {
 
     // Save directly to Firestore
     await safeFirestoreWrite(
-      () => setDoc(doc(db, 'jersey_orders', friendId), newFriend),
+      () => setDoc(doc(db, 'jersey_orders', friendId), sanitizeForFirestore(newFriend)),
       OperationType.WRITE,
       `jersey_orders/${friendId}`
     );
@@ -300,7 +311,7 @@ export function useJerseyTracker() {
     setFriends((prev) =>
       prev.map((item) => {
         if (item.id !== id) return item;
-        updatedFriend = {
+        const candidate: FriendJerseyOrder = {
           ...item,
           name: data.name.trim(),
           phone: data.phone.trim(),
@@ -312,16 +323,24 @@ export function useJerseyTracker() {
           balance,
           status,
           notes: data.notes.trim(),
-          moneyIssue: data.moneyIssue,
           updatedAt: now,
         };
-        return updatedFriend;
+        if (data.moneyIssue) {
+          candidate.moneyIssue = data.moneyIssue;
+        } else {
+          delete candidate.moneyIssue;
+        }
+        updatedFriend = candidate;
+        return candidate;
       })
     );
 
-    if (updatedFriend) {
+    const fallback = friends.find((f) => f.id === id);
+    const finalFriend = updatedFriend || fallback;
+
+    if (finalFriend) {
       await safeFirestoreWrite(
-        () => setDoc(doc(db, 'jersey_orders', id), updatedFriend!),
+        () => setDoc(doc(db, 'jersey_orders', id), sanitizeForFirestore(finalFriend)),
         OperationType.WRITE,
         `jersey_orders/${id}`
       );
@@ -342,19 +361,27 @@ export function useJerseyTracker() {
         const hasIssue = Boolean(issue?.hasIssue);
         const newStatus = calculatePaymentStatus(item.totalJerseyPrice, item.amountPaid, hasIssue);
 
-        updatedFriend = {
+        const candidate: FriendJerseyOrder = {
           ...item,
-          moneyIssue: issue,
           status: newStatus,
           updatedAt: now,
         };
-        return updatedFriend;
+        if (issue) {
+          candidate.moneyIssue = issue;
+        } else {
+          delete candidate.moneyIssue;
+        }
+        updatedFriend = candidate;
+        return candidate;
       })
     );
 
-    if (updatedFriend) {
+    const fallback = friends.find((f) => f.id === friendId);
+    const finalFriend = updatedFriend || fallback;
+
+    if (finalFriend) {
       await safeFirestoreWrite(
-        () => setDoc(doc(db, 'jersey_orders', friendId), updatedFriend!),
+        () => setDoc(doc(db, 'jersey_orders', friendId), sanitizeForFirestore(finalFriend)),
         OperationType.WRITE,
         `jersey_orders/${friendId}`
       );
@@ -384,7 +411,7 @@ export function useJerseyTracker() {
     if (safeAmount <= 0) return;
 
     const now = new Date().toISOString();
-    let updatedFriend: FriendJerseyOrder | null = null;
+    let computedFriend: FriendJerseyOrder | null = null;
 
     setFriends((prev) =>
       prev.map((friend) => {
@@ -404,23 +431,39 @@ export function useJerseyTracker() {
           notes: notes.trim() || `Payment received via ${method}`,
         };
 
-        updatedFriend = {
+        const candidate: FriendJerseyOrder = {
           ...friend,
           amountPaid: updatedAmountPaid,
           balance: newBalance,
           status: newStatus,
-          moneyIssue: shouldResolve ? undefined : friend.moneyIssue,
           updatedAt: now,
           paymentHistory: [newTx, ...friend.paymentHistory],
         };
 
-        return updatedFriend;
+        if (!shouldResolve && friend.moneyIssue) {
+          candidate.moneyIssue = friend.moneyIssue;
+        } else {
+          delete candidate.moneyIssue;
+        }
+
+        computedFriend = candidate;
+        return candidate;
       })
     );
 
-    if (updatedFriend) {
+    const fallbackTarget = friends.find((f) => f.id === friendId);
+    const finalFriend = computedFriend || fallbackTarget;
+
+    if (finalFriend) {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY_FRIENDS);
+        const list = stored ? JSON.parse(stored) : [];
+        const nextList = list.map((f: FriendJerseyOrder) => f.id === friendId ? finalFriend : f);
+        localStorage.setItem(STORAGE_KEY_FRIENDS, JSON.stringify(nextList));
+      } catch {}
+
       await safeFirestoreWrite(
-        () => setDoc(doc(db, 'jersey_orders', friendId), updatedFriend!),
+        () => setDoc(doc(db, 'jersey_orders', friendId), sanitizeForFirestore(finalFriend)),
         OperationType.WRITE,
         `jersey_orders/${friendId}`
       );
@@ -433,8 +476,8 @@ export function useJerseyTracker() {
     targetStatus: PaymentStatus,
     issueDetails?: FriendJerseyOrder['moneyIssue']
   ) => {
-    let updatedFriend: FriendJerseyOrder | null = null;
     const now = new Date().toISOString();
+    let computedFriend: FriendJerseyOrder | null = null;
 
     setFriends((prev) =>
       prev.map((friend) => {
@@ -443,11 +486,11 @@ export function useJerseyTracker() {
         let newAmountPaid = friend.amountPaid;
         let newBalance = friend.balance;
         let newStatus: PaymentStatus = targetStatus;
-        let newIssue: FriendJerseyOrder['moneyIssue'] = undefined;
+        let newIssue: FriendJerseyOrder['moneyIssue'] | undefined = undefined;
         let newHistory = [...friend.paymentHistory];
 
         if (targetStatus === 'PAID') {
-          const diff = friend.totalJerseyPrice - friend.amountPaid;
+          const diff = Math.max(0, friend.totalJerseyPrice - friend.amountPaid);
           newAmountPaid = friend.totalJerseyPrice;
           newBalance = 0;
           newStatus = 'PAID';
@@ -496,23 +539,64 @@ export function useJerseyTracker() {
           };
         }
 
-        updatedFriend = {
+        const candidate: FriendJerseyOrder = {
           ...friend,
           amountPaid: newAmountPaid,
           balance: newBalance,
           status: newStatus,
-          moneyIssue: newIssue,
           updatedAt: now,
           paymentHistory: newHistory,
         };
 
-        return updatedFriend;
+        if (newIssue) {
+          candidate.moneyIssue = newIssue;
+        } else {
+          delete candidate.moneyIssue;
+        }
+
+        computedFriend = candidate;
+        return candidate;
       })
     );
 
-    if (updatedFriend) {
+    const fallbackTarget = friends.find((f) => f.id === friendId);
+    let finalFriend: FriendJerseyOrder | null = computedFriend;
+
+    if (!finalFriend && fallbackTarget) {
+      const diff = Math.max(0, fallbackTarget.totalJerseyPrice - fallbackTarget.amountPaid);
+      const fallbackFriend: FriendJerseyOrder = {
+        ...fallbackTarget,
+        amountPaid: targetStatus === 'PAID' ? fallbackTarget.totalJerseyPrice : fallbackTarget.amountPaid,
+        balance: targetStatus === 'PAID' ? 0 : fallbackTarget.balance,
+        status: targetStatus,
+        updatedAt: now,
+        paymentHistory: targetStatus === 'PAID' && diff > 0 ? [
+          {
+            id: `pay-${Date.now()}`,
+            amount: diff,
+            date: now,
+            method: 'UPI',
+            notes: 'Cleared full payment',
+          },
+          ...fallbackTarget.paymentHistory,
+        ] : fallbackTarget.paymentHistory,
+      };
+      if (targetStatus === 'PAID' || targetStatus === 'NOT_PAID' || targetStatus === 'HALF_PAID') {
+        delete fallbackFriend.moneyIssue;
+      }
+      finalFriend = fallbackFriend;
+    }
+
+    if (finalFriend) {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY_FRIENDS);
+        const list = stored ? JSON.parse(stored) : [];
+        const nextList = list.map((f: FriendJerseyOrder) => f.id === friendId ? finalFriend : f);
+        localStorage.setItem(STORAGE_KEY_FRIENDS, JSON.stringify(nextList));
+      } catch {}
+
       await safeFirestoreWrite(
-        () => setDoc(doc(db, 'jersey_orders', friendId), updatedFriend!),
+        () => setDoc(doc(db, 'jersey_orders', friendId), sanitizeForFirestore(finalFriend!)),
         OperationType.WRITE,
         `jersey_orders/${friendId}`
       );
@@ -553,9 +637,12 @@ export function useJerseyTracker() {
       })
     );
 
-    if (updatedFriend) {
+    const fallback = friends.find((f) => f.id === friendId);
+    const finalFriend = updatedFriend || fallback;
+
+    if (finalFriend) {
       await safeFirestoreWrite(
-        () => setDoc(doc(db, 'jersey_orders', friendId), updatedFriend!),
+        () => setDoc(doc(db, 'jersey_orders', friendId), sanitizeForFirestore(finalFriend)),
         OperationType.WRITE,
         `jersey_orders/${friendId}`
       );

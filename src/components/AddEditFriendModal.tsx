@@ -297,18 +297,20 @@ export function AddEditFriendModal({
                 <button
                   type="button"
                   onClick={() => {
-                    setAmountPaid(totalPrice);
+                    const price = totalPrice > 0 ? totalPrice : (defaultJerseyPrice || 1200);
+                    if (totalPrice <= 0) setTotalPrice(price);
+                    setAmountPaid(price);
                     setHasMoneyIssue(false);
                   }}
                   className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                    !hasMoneyIssue && amountPaid >= totalPrice && totalPrice > 0
+                    !hasMoneyIssue && amountPaid >= (totalPrice > 0 ? totalPrice : 1)
                       ? 'bg-emerald-950/70 border-emerald-500 text-emerald-300 ring-2 ring-emerald-500/40 shadow-lg'
                       : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
                   }`}
                 >
                   <span className="text-base">🟢</span>
                   <span className="text-xs font-bold">Paid</span>
-                  <span className="text-[10px] text-emerald-400/80 font-mono-num">{formatCurrency(totalPrice, currency)}</span>
+                  <span className="text-[10px] text-emerald-400/80 font-mono-num">{formatCurrency(totalPrice > 0 ? totalPrice : (defaultJerseyPrice || 1200))}</span>
                 </button>
 
                 {/* 2. Half Paid */}

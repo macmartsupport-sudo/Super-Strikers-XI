@@ -21,12 +21,13 @@ const app = initializeApp(firebaseConfig);
 // Set log level to avoid internal connection retry warnings in console/preview
 setLogLevel('error');
 
-// CRITICAL: Initialize Firestore with databaseId and experimentalForceLongPolling
-// to prevent WebChannel stream disconnects and [code=unavailable] in preview iframes/proxies
+// CRITICAL: Initialize Firestore with databaseId, experimentalForceLongPolling and ignoreUndefinedProperties
+// to prevent WebChannel stream disconnects and unsupported undefined errors
 export const db = initializeFirestore(
   app,
   {
     experimentalForceLongPolling: true,
+    ignoreUndefinedProperties: true,
   },
   firebaseConfig.firestoreDatabaseId
 );

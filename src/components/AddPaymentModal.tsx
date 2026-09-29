@@ -59,6 +59,18 @@ export function AddPaymentModal({
     onClose();
   };
 
+  const handleDirectFullPay = () => {
+    if (friend.balance <= 0) return;
+    onAddPayment(
+      friend.id,
+      friend.balance,
+      method,
+      'Cleared full remaining balance',
+      hasActiveIssue ? resolveIssue : false
+    );
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
       <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden my-8">
@@ -146,10 +158,19 @@ export function AddPaymentModal({
               {friend.balance > 0 && (
                 <button
                   type="button"
+                  onClick={handleDirectFullPay}
+                  className="px-3 py-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                >
+                  <span>✓ Mark Full Paid (Instant)</span>
+                </button>
+              )}
+              {friend.balance > 0 && (
+                <button
+                  type="button"
                   onClick={() => setPaymentAmount(friend.balance)}
                   className="px-2.5 py-1 text-xs font-semibold text-emerald-300 bg-emerald-950/70 border border-emerald-500/50 rounded-lg hover:bg-emerald-900/60 transition-colors cursor-pointer"
                 >
-                  🟢 Clear Full Balance ({formatCurrency(friend.balance)})
+                  Fill Full: {formatCurrency(friend.balance)}
                 </button>
               )}
               {friend.amountPaid === 0 && friend.totalJerseyPrice > 0 && (

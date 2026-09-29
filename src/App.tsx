@@ -72,6 +72,11 @@ export default function App() {
   const [friendToDelete, setFriendToDelete] = useState<FriendJerseyOrder | null>(null);
   const [isErrorDismissed, setIsErrorDismissed] = useState(false);
 
+  // Dynamically resolve latest friend data from state so modal actions like "Paid" immediately reflect
+  const currentDetailsFriend = detailsFriend ? friends.find((f) => f.id === detailsFriend.id) || detailsFriend : null;
+  const currentPaymentFriend = paymentFriend ? friends.find((f) => f.id === paymentFriend.id) || paymentFriend : null;
+  const currentMoneyIssueFriend = moneyIssueFriend ? friends.find((f) => f.id === moneyIssueFriend.id) || moneyIssueFriend : null;
+
   // Filtered & sorted list
   const filteredFriends = useMemo(() => {
     return friends
@@ -544,7 +549,7 @@ export default function App() {
       <AddPaymentModal
         isOpen={isAddPaymentOpen}
         onClose={() => setIsAddPaymentOpen(false)}
-        friend={paymentFriend}
+        friend={currentPaymentFriend}
         currency={settings.currency}
         onAddPayment={addPayment}
         onDeleteTransaction={deletePaymentTransaction}
@@ -553,7 +558,7 @@ export default function App() {
       <MoneyIssueModal
         isOpen={isMoneyIssueOpen}
         onClose={() => setIsMoneyIssueOpen(false)}
-        friend={moneyIssueFriend}
+        friend={currentMoneyIssueFriend}
         currency={settings.currency}
         onSaveIssue={handleSaveMoneyIssue}
       />
@@ -561,17 +566,12 @@ export default function App() {
       <FriendDetailsModal
         isOpen={isDetailsOpen}
         onClose={() => setIsDetailsOpen(false)}
-        friend={detailsFriend}
+        friend={currentDetailsFriend}
         currency={settings.currency}
         teamName={settings.teamName}
         upiId={settings.upiId}
         onQuickSetStatus={(id, status) => {
           quickSetStatus(id, status);
-          if (detailsFriend && detailsFriend.id === id) {
-            // refresh details modal friend object
-            const updated = friends.find((f) => f.id === id);
-            if (updated) setDetailsFriend(updated);
-          }
         }}
         onOpenAddPayment={(f) => {
           setIsDetailsOpen(false);
