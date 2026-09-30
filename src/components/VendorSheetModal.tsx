@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { X, Copy, Check, Printer, Download, Filter } from 'lucide-react';
 import { FriendJerseyOrder, StatusFilter } from '../types/jersey';
 import { JERSEY_SIZES, exportToCSV, getStatusConfig } from '../utils/calculations';
+import { CRICKET_LOGO_URL, FALLBACK_LOGO_URL } from '../assets/logo';
 
 interface VendorSheetModalProps {
   isOpen: boolean;
@@ -71,9 +72,14 @@ export function VendorSheetModal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/90 no-print">
           <div className="flex items-center gap-3">
             <img
-              src="/src/assets/images/cricket_jersey_logo_1790667442860.jpg"
+              src={CRICKET_LOGO_URL}
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (target.src !== window.location.origin + FALLBACK_LOGO_URL) {
+                  target.src = FALLBACK_LOGO_URL;
+                }
+              }}
               alt="Team Emblem"
-              referrerPolicy="no-referrer"
               className="w-10 h-10 rounded-xl object-cover border border-slate-700 shadow-md shadow-blue-900/30 flex-shrink-0"
             />
             <div>

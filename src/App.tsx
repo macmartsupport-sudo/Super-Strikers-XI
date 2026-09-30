@@ -26,6 +26,7 @@ import { MoneyIssueModal } from './components/MoneyIssueModal';
 import { VendorSheetModal } from './components/VendorSheetModal';
 import { TeamSettingsModal } from './components/TeamSettingsModal';
 import { ConfirmModal } from './components/ConfirmModal';
+import { CRICKET_LOGO_URL, FALLBACK_LOGO_URL } from './assets/logo';
 
 export default function App() {
   const {
@@ -400,9 +401,14 @@ export default function App() {
               <div className="relative w-20 h-20 mx-auto">
                 <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-amber-500 rounded-2xl blur opacity-50"></div>
                 <img
-                  src="/src/assets/images/cricket_jersey_logo_1790667442860.jpg"
+                  src={CRICKET_LOGO_URL}
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    if (target.src !== window.location.origin + FALLBACK_LOGO_URL) {
+                      target.src = FALLBACK_LOGO_URL;
+                    }
+                  }}
                   alt={`${settings.teamName} Emblem`}
-                  referrerPolicy="no-referrer"
                   className="relative w-20 h-20 rounded-2xl object-cover border border-slate-700 shadow-xl"
                 />
               </div>
@@ -501,9 +507,14 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <img
-              src="/src/assets/images/cricket_jersey_logo_1790667442860.jpg"
+              src={CRICKET_LOGO_URL}
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (target.src !== window.location.origin + FALLBACK_LOGO_URL) {
+                  target.src = FALLBACK_LOGO_URL;
+                }
+              }}
               alt="Logo icon"
-              referrerPolicy="no-referrer"
               className="w-5 h-5 rounded-md object-cover border border-slate-700"
             />
             <span>{settings.teamName} · Official Cricket Jersey Payment Tracker</span>

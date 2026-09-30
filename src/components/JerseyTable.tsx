@@ -189,14 +189,9 @@ export function JerseyTable({
                         <span>✓ Paid</span>
                       </button>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => onQuickSetStatus && onQuickSetStatus(friend.id, 'NOT_PAID')}
-                        title="Fully Paid. Click to toggle unpaid if needed."
-                        className="px-2 py-0.5 text-[10px] font-bold text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 rounded-lg cursor-pointer hover:bg-rose-950/40 hover:text-rose-300 hover:border-rose-500/40 transition-colors"
-                      >
+                      <span className="px-2 py-0.5 text-[10px] font-bold text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 rounded-lg">
                         ✓ Paid
-                      </button>
+                      </span>
                     )}
 
                     {/* Add Partial Payment Button */}

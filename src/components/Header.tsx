@@ -1,5 +1,6 @@
 import { Plus, Download, FileSpreadsheet, Settings, Cloud, Loader2 } from 'lucide-react';
 import { TeamSettings } from '../types/jersey';
+import { CRICKET_LOGO_URL, FALLBACK_LOGO_URL } from '../assets/logo';
 
 interface HeaderProps {
   settings: TeamSettings;
@@ -28,9 +29,14 @@ export function Header({
           <div className="relative group flex-shrink-0">
             <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-amber-500 rounded-xl blur-[2px] opacity-60 group-hover:opacity-100 transition duration-300"></div>
             <img
-              src="/src/assets/images/cricket_jersey_logo_1790667442860.jpg"
+              src={CRICKET_LOGO_URL}
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (target.src !== window.location.origin + FALLBACK_LOGO_URL) {
+                  target.src = FALLBACK_LOGO_URL;
+                }
+              }}
               alt={`${settings.teamName} Logo`}
-              referrerPolicy="no-referrer"
               className="relative w-10 h-10 rounded-xl object-cover border border-slate-700/80 shadow-md shadow-blue-900/30"
             />
           </div>

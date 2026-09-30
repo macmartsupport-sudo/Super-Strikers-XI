@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FriendJerseyOrder, TeamSettings, JerseySize, PaymentStatus } from '../types/jersey';
+import { FriendJerseyOrder, TeamSettings, JerseySize, PaymentStatus, PaymentTransaction } from '../types/jersey';
 import { calculateBalance, calculatePaymentStatus } from '../utils/calculations';
 import { INITIAL_SAMPLE_FRIENDS } from '../utils/sampleData';
 import {
@@ -72,18 +72,33 @@ export function useJerseyTracker() {
         const cloudFriends: FriendJerseyOrder[] = [];
 
         snapshot.forEach((docSnap) => {
-          const data = docSnap.data() as FriendJerseyOrder;
+          const raw = docSnap.data() as FriendJerseyOrder;
+          const totalJerseyPrice = Math.max(0, Number(raw.totalJerseyPrice) || 0);
+          const amountPaid = Math.max(0, Number(raw.amountPaid) || 0);
+          const hasIssue = Boolean(raw.moneyIssue?.hasIssue);
+          const balance = calculateBalance(totalJerseyPrice, amountPaid);
+          const status = calculatePaymentStatus(totalJerseyPrice, amountPaid, hasIssue);
+
           cloudFriends.push({
-            ...data,
+            ...raw,
             id: docSnap.id,
+            totalJerseyPrice,
+            amountPaid,
+            balance,
+            status,
+            paymentHistory: Array.isArray(raw.paymentHistory) ? raw.paymentHistory : [],
           });
+        });
+
+        // Keep most recently updated/created players at top
+        cloudFriends.sort((a, b) => {
+          const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+          const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+          return timeB - timeA;
         });
 
         if (cloudFriends.length > 0) {
           setFriends(cloudFriends);
-        } else if (snapshot.empty) {
-          // If Firestore is empty, seed with initial sample friends
-          seedInitialSquadToCloud(INITIAL_SAMPLE_FRIENDS);
         }
         setIsCloudSyncing(false);
       },
@@ -299,6 +314,9 @@ export function useJerseyTracker() {
       moneyIssue?: FriendJerseyOrder['moneyIssue'];
     }
   ) => {
+    const existing = friends.find((f) => f.id === id);
+    if (!existing) return;
+
     const totalJerseyPrice = Math.max(0, Number(data.totalJerseyPrice) || 0);
     const amountPaid = Math.max(0, Number(data.amountPaid) || 0);
     const hasIssue = Boolean(data.moneyIssue?.hasIssue);
@@ -306,45 +324,41 @@ export function useJerseyTracker() {
     const status = calculatePaymentStatus(totalJerseyPrice, amountPaid, hasIssue);
     const now = new Date().toISOString();
 
-    let updatedFriend: FriendJerseyOrder | null = null;
+    const finalFriend: FriendJerseyOrder = {
+      ...existing,
+      name: data.name.trim(),
+      phone: data.phone.trim(),
+      jerseySize: data.jerseySize,
+      jerseyNumber: data.jerseyNumber.trim(),
+      jerseyName: (data.jerseyName || data.name).trim().toUpperCase(),
+      totalJerseyPrice,
+      amountPaid,
+      balance,
+      status,
+      notes: data.notes.trim(),
+      updatedAt: now,
+    };
 
-    setFriends((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item;
-        const candidate: FriendJerseyOrder = {
-          ...item,
-          name: data.name.trim(),
-          phone: data.phone.trim(),
-          jerseySize: data.jerseySize,
-          jerseyNumber: data.jerseyNumber.trim(),
-          jerseyName: (data.jerseyName || data.name).trim().toUpperCase(),
-          totalJerseyPrice,
-          amountPaid,
-          balance,
-          status,
-          notes: data.notes.trim(),
-          updatedAt: now,
-        };
-        if (data.moneyIssue) {
-          candidate.moneyIssue = data.moneyIssue;
-        } else {
-          delete candidate.moneyIssue;
-        }
-        updatedFriend = candidate;
-        return candidate;
-      })
-    );
-
-    const fallback = friends.find((f) => f.id === id);
-    const finalFriend = updatedFriend || fallback;
-
-    if (finalFriend) {
-      await safeFirestoreWrite(
-        () => setDoc(doc(db, 'jersey_orders', id), sanitizeForFirestore(finalFriend)),
-        OperationType.WRITE,
-        `jersey_orders/${id}`
-      );
+    if (data.moneyIssue) {
+      finalFriend.moneyIssue = data.moneyIssue;
+    } else {
+      delete finalFriend.moneyIssue;
     }
+
+    setFriends((prev) => prev.map((item) => (item.id === id ? finalFriend : item)));
+
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_FRIENDS);
+      const list = stored ? JSON.parse(stored) : [];
+      const nextList = list.map((f: FriendJerseyOrder) => (f.id === id ? finalFriend : f));
+      localStorage.setItem(STORAGE_KEY_FRIENDS, JSON.stringify(nextList));
+    } catch {}
+
+    await safeFirestoreWrite(
+      () => setDoc(doc(db, 'jersey_orders', id), sanitizeForFirestore(finalFriend)),
+      OperationType.WRITE,
+      `jersey_orders/${id}`
+    );
   };
 
   // Flag or resolve a money issue on a friend
@@ -352,45 +366,51 @@ export function useJerseyTracker() {
     friendId: string,
     issue: FriendJerseyOrder['moneyIssue']
   ) => {
-    let updatedFriend: FriendJerseyOrder | null = null;
+    const existing = friends.find((f) => f.id === friendId);
+    if (!existing) return;
+
     const now = new Date().toISOString();
+    const hasIssue = Boolean(issue?.hasIssue);
+    const newStatus = calculatePaymentStatus(existing.totalJerseyPrice, existing.amountPaid, hasIssue);
 
-    setFriends((prev) =>
-      prev.map((item) => {
-        if (item.id !== friendId) return item;
-        const hasIssue = Boolean(issue?.hasIssue);
-        const newStatus = calculatePaymentStatus(item.totalJerseyPrice, item.amountPaid, hasIssue);
+    const finalFriend: FriendJerseyOrder = {
+      ...existing,
+      status: newStatus,
+      updatedAt: now,
+    };
 
-        const candidate: FriendJerseyOrder = {
-          ...item,
-          status: newStatus,
-          updatedAt: now,
-        };
-        if (issue) {
-          candidate.moneyIssue = issue;
-        } else {
-          delete candidate.moneyIssue;
-        }
-        updatedFriend = candidate;
-        return candidate;
-      })
-    );
-
-    const fallback = friends.find((f) => f.id === friendId);
-    const finalFriend = updatedFriend || fallback;
-
-    if (finalFriend) {
-      await safeFirestoreWrite(
-        () => setDoc(doc(db, 'jersey_orders', friendId), sanitizeForFirestore(finalFriend)),
-        OperationType.WRITE,
-        `jersey_orders/${friendId}`
-      );
+    if (issue) {
+      finalFriend.moneyIssue = issue;
+    } else {
+      delete finalFriend.moneyIssue;
     }
+
+    setFriends((prev) => prev.map((item) => (item.id === friendId ? finalFriend : item)));
+
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_FRIENDS);
+      const list = stored ? JSON.parse(stored) : [];
+      const nextList = list.map((f: FriendJerseyOrder) => (f.id === friendId ? finalFriend : f));
+      localStorage.setItem(STORAGE_KEY_FRIENDS, JSON.stringify(nextList));
+    } catch {}
+
+    await safeFirestoreWrite(
+      () => setDoc(doc(db, 'jersey_orders', friendId), sanitizeForFirestore(finalFriend)),
+      OperationType.WRITE,
+      `jersey_orders/${friendId}`
+    );
   };
 
   // Delete friend
   const deleteFriend = async (id: string) => {
     setFriends((prev) => prev.filter((item) => item.id !== id));
+
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_FRIENDS);
+      const list = stored ? JSON.parse(stored) : [];
+      const nextList = list.filter((f: FriendJerseyOrder) => f.id !== id);
+      localStorage.setItem(STORAGE_KEY_FRIENDS, JSON.stringify(nextList));
+    } catch {}
 
     await safeFirestoreWrite(
       () => deleteDoc(doc(db, 'jersey_orders', id)),
@@ -410,64 +430,53 @@ export function useJerseyTracker() {
     const safeAmount = Math.max(0, Number(newPaymentAmount) || 0);
     if (safeAmount <= 0) return;
 
+    const existing = friends.find((f) => f.id === friendId);
+    if (!existing) return;
+
     const now = new Date().toISOString();
-    let computedFriend: FriendJerseyOrder | null = null;
+    const updatedAmountPaid = existing.amountPaid + safeAmount;
+    const newBalance = calculateBalance(existing.totalJerseyPrice, updatedAmountPaid);
+    const shouldResolve = resolveMoneyIssue || (existing.moneyIssue?.issueType === 'UPI_FAILED_OR_PENDING' && updatedAmountPaid >= existing.totalJerseyPrice);
+    const hasIssue = shouldResolve ? false : Boolean(existing.moneyIssue?.hasIssue);
+    const newStatus = calculatePaymentStatus(existing.totalJerseyPrice, updatedAmountPaid, hasIssue);
 
-    setFriends((prev) =>
-      prev.map((friend) => {
-        if (friend.id !== friendId) return friend;
+    const newTx: PaymentTransaction = {
+      id: `pay-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      amount: safeAmount,
+      date: now,
+      method,
+      notes: notes.trim() || `Payment received via ${method}`,
+    };
 
-        const updatedAmountPaid = friend.amountPaid + safeAmount;
-        const newBalance = calculateBalance(friend.totalJerseyPrice, updatedAmountPaid);
-        const shouldResolve = resolveMoneyIssue || (friend.moneyIssue?.issueType === 'UPI_FAILED_OR_PENDING' && updatedAmountPaid >= friend.totalJerseyPrice);
-        const hasIssue = shouldResolve ? false : Boolean(friend.moneyIssue?.hasIssue);
-        const newStatus = calculatePaymentStatus(friend.totalJerseyPrice, updatedAmountPaid, hasIssue);
+    const finalFriend: FriendJerseyOrder = {
+      ...existing,
+      amountPaid: updatedAmountPaid,
+      balance: newBalance,
+      status: newStatus,
+      updatedAt: now,
+      paymentHistory: [newTx, ...(existing.paymentHistory || [])],
+    };
 
-        const newTx = {
-          id: `pay-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          amount: safeAmount,
-          date: now,
-          method,
-          notes: notes.trim() || `Payment received via ${method}`,
-        };
-
-        const candidate: FriendJerseyOrder = {
-          ...friend,
-          amountPaid: updatedAmountPaid,
-          balance: newBalance,
-          status: newStatus,
-          updatedAt: now,
-          paymentHistory: [newTx, ...friend.paymentHistory],
-        };
-
-        if (!shouldResolve && friend.moneyIssue) {
-          candidate.moneyIssue = friend.moneyIssue;
-        } else {
-          delete candidate.moneyIssue;
-        }
-
-        computedFriend = candidate;
-        return candidate;
-      })
-    );
-
-    const fallbackTarget = friends.find((f) => f.id === friendId);
-    const finalFriend = computedFriend || fallbackTarget;
-
-    if (finalFriend) {
-      try {
-        const stored = localStorage.getItem(STORAGE_KEY_FRIENDS);
-        const list = stored ? JSON.parse(stored) : [];
-        const nextList = list.map((f: FriendJerseyOrder) => f.id === friendId ? finalFriend : f);
-        localStorage.setItem(STORAGE_KEY_FRIENDS, JSON.stringify(nextList));
-      } catch {}
-
-      await safeFirestoreWrite(
-        () => setDoc(doc(db, 'jersey_orders', friendId), sanitizeForFirestore(finalFriend)),
-        OperationType.WRITE,
-        `jersey_orders/${friendId}`
-      );
+    if (!shouldResolve && existing.moneyIssue) {
+      finalFriend.moneyIssue = existing.moneyIssue;
+    } else {
+      delete finalFriend.moneyIssue;
     }
+
+    setFriends((prev) => prev.map((f) => (f.id === friendId ? finalFriend : f)));
+
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_FRIENDS);
+      const list = stored ? JSON.parse(stored) : [];
+      const nextList = list.map((f: FriendJerseyOrder) => (f.id === friendId ? finalFriend : f));
+      localStorage.setItem(STORAGE_KEY_FRIENDS, JSON.stringify(nextList));
+    } catch {}
+
+    await safeFirestoreWrite(
+      () => setDoc(doc(db, 'jersey_orders', friendId), sanitizeForFirestore(finalFriend)),
+      OperationType.WRITE,
+      `jersey_orders/${friendId}`
+    );
   };
 
   // Quick set status directly: PAID, HALF_PAID, NOT_PAID, or MONEY_ISSUE
@@ -476,131 +485,95 @@ export function useJerseyTracker() {
     targetStatus: PaymentStatus,
     issueDetails?: FriendJerseyOrder['moneyIssue']
   ) => {
+    const existing = friends.find((f) => f.id === friendId);
+    if (!existing) return;
+
     const now = new Date().toISOString();
-    let computedFriend: FriendJerseyOrder | null = null;
+    let newAmountPaid = existing.amountPaid;
+    let newBalance = existing.balance;
+    let newStatus: PaymentStatus = targetStatus;
+    let newIssue: FriendJerseyOrder['moneyIssue'] | undefined = undefined;
+    let newHistory = [...(existing.paymentHistory || [])];
 
-    setFriends((prev) =>
-      prev.map((friend) => {
-        if (friend.id !== friendId) return friend;
-
-        let newAmountPaid = friend.amountPaid;
-        let newBalance = friend.balance;
-        let newStatus: PaymentStatus = targetStatus;
-        let newIssue: FriendJerseyOrder['moneyIssue'] | undefined = undefined;
-        let newHistory = [...friend.paymentHistory];
-
-        if (targetStatus === 'PAID') {
-          const diff = Math.max(0, friend.totalJerseyPrice - friend.amountPaid);
-          newAmountPaid = friend.totalJerseyPrice;
-          newBalance = 0;
-          newStatus = 'PAID';
-          newIssue = undefined;
-          if (diff > 0) {
-            newHistory = [
-              {
-                id: `pay-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-                amount: diff,
-                date: now,
-                method: 'UPI',
-                notes: 'Cleared full payment',
-              },
-              ...newHistory,
-            ];
-          }
-        } else if (targetStatus === 'HALF_PAID') {
-          const half = Math.round(friend.totalJerseyPrice / 2);
-          newAmountPaid = half;
-          newBalance = calculateBalance(friend.totalJerseyPrice, half);
-          newStatus = 'HALF_PAID';
-          newIssue = undefined;
-          newHistory = [
-            {
-              id: `pay-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-              amount: half,
-              date: now,
-              method: 'UPI',
-              notes: '50% advance installment',
-            },
-          ];
-        } else if (targetStatus === 'NOT_PAID') {
-          newAmountPaid = 0;
-          newBalance = friend.totalJerseyPrice;
-          newStatus = 'NOT_PAID';
-          newIssue = undefined;
-          newHistory = [];
-        } else if (targetStatus === 'MONEY_ISSUE') {
-          newStatus = 'MONEY_ISSUE';
-          newIssue = issueDetails || {
-            hasIssue: true,
-            issueType: friend.amountPaid > friend.totalJerseyPrice ? 'OVERPAID' : 'UPI_FAILED_OR_PENDING',
-            issueAmount: friend.balance || friend.totalJerseyPrice,
-            issueNote: 'Payment discrepancy flagged by captain',
-            flaggedAt: now,
-          };
-        }
-
-        const candidate: FriendJerseyOrder = {
-          ...friend,
-          amountPaid: newAmountPaid,
-          balance: newBalance,
-          status: newStatus,
-          updatedAt: now,
-          paymentHistory: newHistory,
-        };
-
-        if (newIssue) {
-          candidate.moneyIssue = newIssue;
-        } else {
-          delete candidate.moneyIssue;
-        }
-
-        computedFriend = candidate;
-        return candidate;
-      })
-    );
-
-    const fallbackTarget = friends.find((f) => f.id === friendId);
-    let finalFriend: FriendJerseyOrder | null = computedFriend;
-
-    if (!finalFriend && fallbackTarget) {
-      const diff = Math.max(0, fallbackTarget.totalJerseyPrice - fallbackTarget.amountPaid);
-      const fallbackFriend: FriendJerseyOrder = {
-        ...fallbackTarget,
-        amountPaid: targetStatus === 'PAID' ? fallbackTarget.totalJerseyPrice : fallbackTarget.amountPaid,
-        balance: targetStatus === 'PAID' ? 0 : fallbackTarget.balance,
-        status: targetStatus,
-        updatedAt: now,
-        paymentHistory: targetStatus === 'PAID' && diff > 0 ? [
+    if (targetStatus === 'PAID') {
+      const diff = Math.max(0, existing.totalJerseyPrice - existing.amountPaid);
+      newAmountPaid = existing.totalJerseyPrice;
+      newBalance = 0;
+      newStatus = 'PAID';
+      newIssue = undefined;
+      if (diff > 0) {
+        newHistory = [
           {
-            id: `pay-${Date.now()}`,
+            id: `pay-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
             amount: diff,
             date: now,
             method: 'UPI',
             notes: 'Cleared full payment',
           },
-          ...fallbackTarget.paymentHistory,
-        ] : fallbackTarget.paymentHistory,
-      };
-      if (targetStatus === 'PAID' || targetStatus === 'NOT_PAID' || targetStatus === 'HALF_PAID') {
-        delete fallbackFriend.moneyIssue;
+          ...newHistory,
+        ];
       }
-      finalFriend = fallbackFriend;
+    } else if (targetStatus === 'HALF_PAID') {
+      const half = Math.round(existing.totalJerseyPrice / 2);
+      newAmountPaid = half;
+      newBalance = calculateBalance(existing.totalJerseyPrice, half);
+      newStatus = 'HALF_PAID';
+      newIssue = undefined;
+      newHistory = [
+        {
+          id: `pay-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          amount: half,
+          date: now,
+          method: 'UPI',
+          notes: '50% advance installment',
+        },
+      ];
+    } else if (targetStatus === 'NOT_PAID') {
+      newAmountPaid = 0;
+      newBalance = existing.totalJerseyPrice;
+      newStatus = 'NOT_PAID';
+      newIssue = undefined;
+      newHistory = [];
+    } else if (targetStatus === 'MONEY_ISSUE') {
+      newStatus = 'MONEY_ISSUE';
+      newIssue = issueDetails || {
+        hasIssue: true,
+        issueType: existing.amountPaid > existing.totalJerseyPrice ? 'OVERPAID' : 'UPI_FAILED_OR_PENDING',
+        issueAmount: existing.balance || existing.totalJerseyPrice,
+        issueNote: 'Payment discrepancy flagged by captain',
+        flaggedAt: now,
+      };
     }
 
-    if (finalFriend) {
-      try {
-        const stored = localStorage.getItem(STORAGE_KEY_FRIENDS);
-        const list = stored ? JSON.parse(stored) : [];
-        const nextList = list.map((f: FriendJerseyOrder) => f.id === friendId ? finalFriend : f);
-        localStorage.setItem(STORAGE_KEY_FRIENDS, JSON.stringify(nextList));
-      } catch {}
+    const finalFriend: FriendJerseyOrder = {
+      ...existing,
+      amountPaid: newAmountPaid,
+      balance: newBalance,
+      status: newStatus,
+      updatedAt: now,
+      paymentHistory: newHistory,
+    };
 
-      await safeFirestoreWrite(
-        () => setDoc(doc(db, 'jersey_orders', friendId), sanitizeForFirestore(finalFriend!)),
-        OperationType.WRITE,
-        `jersey_orders/${friendId}`
-      );
+    if (newIssue) {
+      finalFriend.moneyIssue = newIssue;
+    } else {
+      delete finalFriend.moneyIssue;
     }
+
+    setFriends((prev) => prev.map((f) => (f.id === friendId ? finalFriend : f)));
+
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_FRIENDS);
+      const list = stored ? JSON.parse(stored) : [];
+      const nextList = list.map((f: FriendJerseyOrder) => (f.id === friendId ? finalFriend : f));
+      localStorage.setItem(STORAGE_KEY_FRIENDS, JSON.stringify(nextList));
+    } catch {}
+
+    await safeFirestoreWrite(
+      () => setDoc(doc(db, 'jersey_orders', friendId), sanitizeForFirestore(finalFriend)),
+      OperationType.WRITE,
+      `jersey_orders/${friendId}`
+    );
   };
 
   // Quick mark fully paid
@@ -610,43 +583,41 @@ export function useJerseyTracker() {
 
   // Delete an individual payment transaction
   const deletePaymentTransaction = async (friendId: string, txId: string) => {
-    let updatedFriend: FriendJerseyOrder | null = null;
+    const existing = friends.find((f) => f.id === friendId);
+    if (!existing) return;
 
-    setFriends((prev) =>
-      prev.map((friend) => {
-        if (friend.id !== friendId) return friend;
+    const targetTx = existing.paymentHistory?.find((t) => t.id === txId);
+    if (!targetTx) return;
 
-        const targetTx = friend.paymentHistory.find((t) => t.id === txId);
-        if (!targetTx) return friend;
+    const remainingHistory = (existing.paymentHistory || []).filter((t) => t.id !== txId);
+    const newAmountPaid = Math.max(0, existing.amountPaid - targetTx.amount);
+    const newBalance = calculateBalance(existing.totalJerseyPrice, newAmountPaid);
+    const hasIssue = Boolean(existing.moneyIssue?.hasIssue);
+    const newStatus = calculatePaymentStatus(existing.totalJerseyPrice, newAmountPaid, hasIssue);
 
-        const remainingHistory = friend.paymentHistory.filter((t) => t.id !== txId);
-        const newAmountPaid = Math.max(0, friend.amountPaid - targetTx.amount);
-        const newBalance = calculateBalance(friend.totalJerseyPrice, newAmountPaid);
-        const newStatus = calculatePaymentStatus(friend.totalJerseyPrice, newAmountPaid);
+    const finalFriend: FriendJerseyOrder = {
+      ...existing,
+      amountPaid: newAmountPaid,
+      balance: newBalance,
+      status: newStatus,
+      updatedAt: new Date().toISOString(),
+      paymentHistory: remainingHistory,
+    };
 
-        updatedFriend = {
-          ...friend,
-          amountPaid: newAmountPaid,
-          balance: newBalance,
-          status: newStatus,
-          updatedAt: new Date().toISOString(),
-          paymentHistory: remainingHistory,
-        };
+    setFriends((prev) => prev.map((f) => (f.id === friendId ? finalFriend : f)));
 
-        return updatedFriend;
-      })
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_FRIENDS);
+      const list = stored ? JSON.parse(stored) : [];
+      const nextList = list.map((f: FriendJerseyOrder) => (f.id === friendId ? finalFriend : f));
+      localStorage.setItem(STORAGE_KEY_FRIENDS, JSON.stringify(nextList));
+    } catch {}
+
+    await safeFirestoreWrite(
+      () => setDoc(doc(db, 'jersey_orders', friendId), sanitizeForFirestore(finalFriend)),
+      OperationType.WRITE,
+      `jersey_orders/${friendId}`
     );
-
-    const fallback = friends.find((f) => f.id === friendId);
-    const finalFriend = updatedFriend || fallback;
-
-    if (finalFriend) {
-      await safeFirestoreWrite(
-        () => setDoc(doc(db, 'jersey_orders', friendId), sanitizeForFirestore(finalFriend)),
-        OperationType.WRITE,
-        `jersey_orders/${friendId}`
-      );
-    }
   };
 
   const resetSampleData = async () => {
